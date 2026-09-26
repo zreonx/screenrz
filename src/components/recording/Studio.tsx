@@ -27,6 +27,7 @@ import {
 } from '@/types/electron';
 import { formatDuration } from '@/lib/utils';
 import { SourcePickerModal } from './SourcePickerModal';
+import { createWebGLCompositor, VideoCompositor } from '@/lib/videoCompositor';
 
 export interface StudioControls {
   pause: () => void;
@@ -76,6 +77,8 @@ export const Studio: React.FC<StudioProps> = ({
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
   const canvasAnimRef = useRef<any>(null);
+  const bgIntervalRef = useRef<any>(null);
+  const compositorRef = useRef<VideoCompositor | null>(null);
   const isProcessingRef = useRef<boolean>(false);
   const durationRef = useRef<number>(0);
 
@@ -83,6 +86,13 @@ export const Studio: React.FC<StudioProps> = ({
   useEffect(() => {
     durationRef.current = duration;
   }, [duration]);
+
+  // Keep live compositor config synchronized with user UI changes
+  useEffect(() => {
+    if (compositorRef.current) {
+      compositorRef.current.updateConfig(cameraPosition, cameraShape);
+    }
+  }, [cameraPosition, cameraShape]);
 
   // Sync initial settings
   useEffect(() => {
@@ -121,9 +131,16 @@ export const Studio: React.FC<StudioProps> = ({
       stopCameraStream();
       if (timerRef.current) clearInterval(timerRef.current);
       if (canvasAnimRef.current) {
-        clearInterval(canvasAnimRef.current);
         cancelAnimationFrame(canvasAnimRef.current);
         canvasAnimRef.current = null;
+      }
+      if (bgIntervalRef.current) {
+        clearInterval(bgIntervalRef.current);
+        bgIntervalRef.current = null;
+      }
+      if (compositorRef.current) {
+        compositorRef.current.destroy();
+        compositorRef.current = null;
       }
     };
   }, []);
@@ -423,7 +440,7 @@ export const Studio: React.FC<StudioProps> = ({
 
       if (!combinedStream) return;
 
-      // IF CAMERA OVERLAY IS ENABLED: Composite camera onto screen using hardware canvas
+      // IF CAMERA OVERLAY IS ENABLED: Composite camera onto screen using hardware WebGL shaders
       if (
         cameraEnabled &&
         cameraVideoRef.current &&
@@ -433,126 +450,80 @@ export const Studio: React.FC<StudioProps> = ({
         const screenVid = videoPreviewRef.current;
         const camVid = cameraVideoRef.current;
 
-        const screenWidth = screenVid.videoWidth || 1920;
-        const screenHeight = screenVid.videoHeight || 1080;
+        // Clean up previous compositor instance if any
+        if (compositorRef.current) {
+          compositorRef.current.destroy();
+          compositorRef.current = null;
+        }
+        if (bgIntervalRef.current) {
+          clearInterval(bgIntervalRef.current);
+          bgIntervalRef.current = null;
+        }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = screenWidth;
-        canvas.height = screenHeight;
-        const ctx = canvas.getContext('2d', {
-          alpha: false,
-          desynchronized: true,
-          willReadFrequently: false,
-        });
+        // Standard HD dimensions (capped at 1920 to eliminate 4K / QHD compositor lag)
+        let targetWidth = screenVid.videoWidth || 1920;
+        let targetHeight = screenVid.videoHeight || 1080;
+        if (targetWidth > 1920) {
+          const scale = 1920 / targetWidth;
+          targetWidth = 1920;
+          targetHeight = Math.round(targetHeight * scale);
+        }
+        if (targetWidth % 2 !== 0) targetWidth--;
+        if (targetHeight % 2 !== 0) targetHeight--;
 
-        // Dedicated offscreen canvas for camera overlay to eliminate expensive 1080p stencil clip ops
-        const diameter = Math.round(screenWidth * (320 / 1920));
-        const radius = diameter / 2;
-        const camCanvas = document.createElement('canvas');
-        camCanvas.width = diameter;
-        camCanvas.height = diameter;
-        const camCtx = camCanvas.getContext('2d', { alpha: true });
+        const compositor = createWebGLCompositor(
+          screenVid,
+          camVid,
+          targetWidth,
+          targetHeight,
+          cameraPosition,
+          cameraShape
+        );
 
-        const pad = Math.round(screenWidth * (40 / 1920));
-        const targetFps = settings?.fps || 60;
+        if (compositor) {
+          compositorRef.current = compositor;
+          const targetFps = settings?.fps || 60;
+          const frameDuration = 1000 / targetFps;
 
-        const drawLoop = () => {
-          if (!ctx) return;
-          // 1. Draw base screen (hardware accelerated copy)
-          try {
-            ctx.drawImage(screenVid, 0, 0, screenWidth, screenHeight);
-          } catch {}
+          let lastFrameTime = performance.now();
 
-          // 2. Draw camera overlay according to shape & position
-          if (camVid && camVid.readyState >= 2) {
-            try {
-              if (cameraShape === 'circle') {
-                if (camCtx) {
-                  camCtx.clearRect(0, 0, diameter, diameter);
-                  camCtx.save();
-                  camCtx.beginPath();
-                  camCtx.arc(radius, radius, radius, 0, Math.PI * 2);
-                  camCtx.clip();
-                  // Mirror image horizontally for natural webcam feel
-                  camCtx.translate(diameter, 0);
-                  camCtx.scale(-1, 1);
-                  camCtx.drawImage(camVid, 0, 0, diameter, diameter);
-                  camCtx.restore();
-                }
+          // Render loop driven by requestAnimationFrame (instant GPU draw in microseconds)
+          const renderLoop = () => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              compositor.render();
+              lastFrameTime = performance.now();
+              canvasAnimRef.current = requestAnimationFrame(renderLoop);
+            }
+          };
 
-                let cx = screenWidth - pad - radius;
-                let cy = screenHeight - pad - radius;
-
-                if (cameraPosition === 'bottom-left') {
-                  cx = pad + radius;
-                  cy = screenHeight - pad - radius;
-                } else if (cameraPosition === 'top-right') {
-                  cx = screenWidth - pad - radius;
-                  cy = pad + radius;
-                } else if (cameraPosition === 'top-left') {
-                  cx = pad + radius;
-                  cy = pad + radius;
-                }
-
-                // Blit fast circular webcam onto screen canvas
-                ctx.drawImage(camCanvas, cx - radius, cy - radius);
-
-                // Accent border ring
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                ctx.lineWidth = 5;
-                ctx.strokeStyle = '#6366f1';
-                ctx.stroke();
-              } else {
-                // Rectangle PiP
-                const rw = Math.round(screenWidth * (420 / 1920));
-                const rh = Math.round(screenHeight * (236 / 1080));
-                let rx = screenWidth - pad - rw;
-                let ry = screenHeight - pad - rh;
-
-                if (cameraPosition === 'bottom-left') {
-                  rx = pad;
-                  ry = screenHeight - pad - rh;
-                } else if (cameraPosition === 'top-right') {
-                  rx = screenWidth - pad - rw;
-                  ry = pad;
-                } else if (cameraPosition === 'top-left') {
-                  rx = pad;
-                  ry = pad;
-                }
-
-                ctx.save();
-                ctx.translate(rx + rw, ry);
-                ctx.scale(-1, 1);
-                ctx.drawImage(camVid, 0, 0, rw, rh);
-                ctx.restore();
-
-                ctx.lineWidth = 5;
-                ctx.strokeStyle = '#6366f1';
-                ctx.strokeRect(rx, ry, rw, rh);
+          // Background safety interval: guarantees 60 FPS even if minimized to Windows Tray
+          const bgFallbackInterval = setInterval(() => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              const now = performance.now();
+              if (now - lastFrameTime >= frameDuration * 1.5) {
+                compositor.render();
+                lastFrameTime = now;
               }
-            } catch {}
-          }
-        };
+            }
+          }, frameDuration);
 
-        // Run rock-solid interval that never drops frames even when minimized
-        const intervalMs = Math.max(12, Math.floor(1000 / targetFps));
-        const intervalId = setInterval(drawLoop, intervalMs);
-        canvasAnimRef.current = intervalId;
+          canvasAnimRef.current = requestAnimationFrame(renderLoop);
+          bgIntervalRef.current = bgFallbackInterval;
 
-        const canvasStream = canvas.captureStream(targetFps);
-        combinedStream = new MediaStream([
-          ...canvasStream.getVideoTracks(),
-          ...combinedStream.getAudioTracks(),
-        ]);
+          const canvasStream = compositor.canvas.captureStream(targetFps);
+          combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...combinedStream.getAudioTracks(),
+          ]);
+        }
       }
 
       recordedChunksRef.current = [];
 
-      // Determine optimal mimeType (prefer VP9 / VP8)
+      // Determine optimal mimeType (VP8 is hardware/CPU light, avoiding VP9 software encoding lag)
       const mimeTypes = [
-        'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
+        'video/webm;codecs=h264,opus',
         'video/webm;codecs=vp8',
         'video/webm',
       ];
@@ -582,9 +553,16 @@ export const Studio: React.FC<StudioProps> = ({
 
       recorder.onstop = async () => {
         if (canvasAnimRef.current) {
-          clearInterval(canvasAnimRef.current);
           cancelAnimationFrame(canvasAnimRef.current);
           canvasAnimRef.current = null;
+        }
+        if (bgIntervalRef.current) {
+          clearInterval(bgIntervalRef.current);
+          bgIntervalRef.current = null;
+        }
+        if (compositorRef.current) {
+          compositorRef.current.destroy();
+          compositorRef.current = null;
         }
         const finalDur = durationRef.current;
         await processAndSaveRecording(selectedMime, finalDur);
@@ -643,9 +621,16 @@ export const Studio: React.FC<StudioProps> = ({
       timerRef.current = null;
     }
     if (canvasAnimRef.current) {
-      clearInterval(canvasAnimRef.current);
       cancelAnimationFrame(canvasAnimRef.current);
       canvasAnimRef.current = null;
+    }
+    if (bgIntervalRef.current) {
+      clearInterval(bgIntervalRef.current);
+      bgIntervalRef.current = null;
+    }
+    if (compositorRef.current) {
+      compositorRef.current.destroy();
+      compositorRef.current = null;
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
