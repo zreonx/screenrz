@@ -8,6 +8,7 @@ import {
   Minimize2,
   Keyboard,
   Sparkles,
+  Camera,
 } from 'lucide-react';
 import { AppSettings } from '@/types/electron';
 
@@ -217,7 +218,71 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       </div>
 
-      {/* SECTION 4: Local SQLite Engine Status */}
+      {/* SECTION 4: Webcam Picture-in-Picture Defaults */}
+      <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+          <Camera className="w-4 h-4 text-indigo-400" />
+          <h3>Webcam Overlay Defaults</h3>
+        </div>
+        <p className="text-xs text-zinc-400 leading-relaxed">
+          Configure default position and shape when recording with a camera overlay.
+        </p>
+
+        {/* Default Shape */}
+        <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
+          <div>
+            <div className="text-xs font-medium text-zinc-200">Default Shape</div>
+            <div className="text-[11px] text-zinc-500">Circle (Loom/Bandicam style) or Rectangle (16:9 PiP).</div>
+          </div>
+          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-zinc-950 border border-zinc-800">
+            {(['circle', 'rectangle'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => onUpdateSettings({ cameraShape: s })}
+                className={`px-3 py-1 rounded-md text-xs capitalize font-medium transition-colors ${
+                  settings?.cameraShape === s
+                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Default Position */}
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <div className="text-xs font-medium text-zinc-200">Default Position</div>
+            <div className="text-[11px] text-zinc-500">Corner where the webcam appears.</div>
+          </div>
+          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-zinc-950 border border-zinc-800">
+            {(
+              [
+                { id: 'bottom-right', label: 'Bottom Right' },
+                { id: 'bottom-left', label: 'Bottom Left' },
+                { id: 'top-right', label: 'Top Right' },
+                { id: 'top-left', label: 'Top Left' },
+              ] as const
+            ).map((pos) => (
+              <button
+                key={pos.id}
+                onClick={() => onUpdateSettings({ cameraPosition: pos.id })}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  settings?.cameraPosition === pos.id
+                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                {pos.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 5: Local SQLite Engine Status */}
       <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
           <Database className="w-4 h-4 text-emerald-400" />

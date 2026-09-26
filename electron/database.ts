@@ -2,12 +2,19 @@ import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
 
+export type CameraPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+export type CameraShape = 'circle' | 'rectangle';
+
 export interface AppSettings {
   outputDirectory: string;
   fps: number;
   videoQuality: 'auto' | 'high' | 'ultra';
   includeMic: boolean;
   includeAudio: boolean;
+  includeCamera: boolean;
+  cameraPosition: CameraPosition;
+  cameraShape: CameraShape;
+  cameraDeviceId?: string;
   theme: 'dark' | 'light';
   autoMinimizeOnRecord: boolean;
   minimizeToTray: boolean;
@@ -26,6 +33,7 @@ export interface RecordingRecord {
   mimeType: string;
   hasAudio: boolean;
   hasMic: boolean;
+  hasCamera?: boolean;
   thumbnailUrl?: string;
   createdAt: string;
 }
@@ -114,6 +122,10 @@ export class LocalDatabase {
       this.saveSetting('videoQuality', 'high');
       this.saveSetting('includeMic', '0');
       this.saveSetting('includeAudio', '1');
+      this.saveSetting('includeCamera', '0');
+      this.saveSetting('cameraPosition', 'bottom-right');
+      this.saveSetting('cameraShape', 'circle');
+      this.saveSetting('cameraDeviceId', '');
       this.saveSetting('theme', 'dark');
       this.saveSetting('autoMinimizeOnRecord', '0');
       this.saveSetting('minimizeToTray', '1');
@@ -128,6 +140,10 @@ export class LocalDatabase {
       videoQuality: 'high',
       includeMic: false,
       includeAudio: true,
+      includeCamera: false,
+      cameraPosition: 'bottom-right',
+      cameraShape: 'circle',
+      cameraDeviceId: '',
       theme: 'dark',
       autoMinimizeOnRecord: false,
       minimizeToTray: true,
@@ -157,6 +173,10 @@ export class LocalDatabase {
         videoQuality: (map.videoQuality as any) || defaults.videoQuality,
         includeMic: map.includeMic === '1',
         includeAudio: map.includeAudio === '1',
+        includeCamera: map.includeCamera === '1',
+        cameraPosition: (map.cameraPosition as CameraPosition) || defaults.cameraPosition,
+        cameraShape: (map.cameraShape as CameraShape) || defaults.cameraShape,
+        cameraDeviceId: map.cameraDeviceId || '',
         theme: (map.theme as any) || defaults.theme,
         autoMinimizeOnRecord: map.autoMinimizeOnRecord === '1',
         minimizeToTray: map.minimizeToTray !== undefined ? map.minimizeToTray === '1' : true,

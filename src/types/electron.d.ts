@@ -1,9 +1,16 @@
+export type CameraPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+export type CameraShape = 'circle' | 'rectangle';
+
 export interface AppSettings {
   outputDirectory: string;
   fps: number;
   videoQuality: 'auto' | 'high' | 'ultra';
   includeMic: boolean;
   includeAudio: boolean;
+  includeCamera: boolean;
+  cameraPosition: CameraPosition;
+  cameraShape: CameraShape;
+  cameraDeviceId?: string;
   theme: 'dark' | 'light';
   autoMinimizeOnRecord: boolean;
   minimizeToTray: boolean;
@@ -22,6 +29,7 @@ export interface RecordingItem {
   mimeType: string;
   hasAudio: boolean;
   hasMic: boolean;
+  hasCamera?: boolean;
   thumbnailUrl?: string;
   createdAt: string;
 }

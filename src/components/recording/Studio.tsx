@@ -12,8 +12,19 @@ import {
   Sparkles,
   FolderOpen,
   CheckCircle2,
+  Camera,
+  CameraOff,
+  Settings,
+  Circle,
+  Square as SquareIcon,
 } from 'lucide-react';
-import { AppSettings, DesktopCapturerSource, RecordingItem } from '@/types/electron';
+import {
+  AppSettings,
+  DesktopCapturerSource,
+  RecordingItem,
+  CameraPosition,
+  CameraShape,
+} from '@/types/electron';
 import { formatDuration } from '@/lib/utils';
 import { SourcePickerModal } from './SourcePickerModal';
 
@@ -49,32 +60,65 @@ export const Studio: React.FC<StudioProps> = ({
   const [sysAudioEnabled, setSysAudioEnabled] = useState(true);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
+  // Camera Overlay State
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraPosition, setCameraPosition] = useState<CameraPosition>('bottom-right');
+  const [cameraShape, setCameraShape] = useState<CameraShape>('circle');
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  const [isCameraConfigOpen, setIsCameraConfigOpen] = useState(false);
+
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
+  const canvasAnimRef = useRef<number | null>(null);
 
   // Sync initial settings
   useEffect(() => {
     if (settings) {
       setMicEnabled(settings.includeMic);
       setSysAudioEnabled(settings.includeAudio);
+      if (settings.includeCamera !== undefined) setCameraEnabled(settings.includeCamera);
+      if (settings.cameraPosition) setCameraPosition(settings.cameraPosition);
+      if (settings.cameraShape) setCameraShape(settings.cameraShape);
+      if (settings.cameraDeviceId) setSelectedCameraId(settings.cameraDeviceId);
     }
   }, [settings]);
 
-  // Clean up media stream on unmount
+  // Enumerate cameras
+  useEffect(() => {
+    navigator.mediaDevices?.enumerateDevices?.().then((devices) => {
+      const cams = devices.filter((d) => d.kind === 'videoinput');
+      setCameraDevices(cams);
+      if (cams.length > 0 && !selectedCameraId) {
+        setSelectedCameraId(cams[0].deviceId);
+      }
+    }).catch(() => {});
+  }, [selectedCameraId]);
+
+  // Clean up on unmount
   useEffect(() => {
     return () => {
       stopPreviewStream();
+      stopCameraStream();
       if (timerRef.current) clearInterval(timerRef.current);
+      if (canvasAnimRef.current) cancelAnimationFrame(canvasAnimRef.current);
     };
   }, []);
 
-  // When tab becomes active again, ensure video preview is playing
+  // When tab becomes active again, ensure video previews are playing
   useEffect(() => {
-    if (isActive && videoPreviewRef.current && mediaStreamRef.current) {
-      videoPreviewRef.current.play().catch(() => {});
+    if (isActive) {
+      if (videoPreviewRef.current && mediaStreamRef.current) {
+        videoPreviewRef.current.play().catch(() => {});
+      }
+      if (cameraVideoRef.current && cameraStreamRef.current) {
+        cameraVideoRef.current.play().catch(() => {});
+      }
     }
   }, [isActive]);
 
@@ -86,6 +130,57 @@ export const Studio: React.FC<StudioProps> = ({
     if (videoPreviewRef.current) {
       videoPreviewRef.current.srcObject = null;
     }
+  };
+
+  const stopCameraStream = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((t) => t.stop());
+      cameraStreamRef.current = null;
+    }
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null;
+    }
+  };
+
+  const startCameraStream = async (deviceId?: string) => {
+    stopCameraStream();
+    try {
+      const constraints: MediaStreamConstraints = {
+        video: deviceId
+          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          : { width: { ideal: 1280 }, height: { ideal: 720 } },
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      cameraStreamRef.current = stream;
+      if (cameraVideoRef.current) {
+        cameraVideoRef.current.srcObject = stream;
+        cameraVideoRef.current.play().catch(() => {});
+      }
+      setCameraEnabled(true);
+    } catch (err) {
+      console.warn('Failed to start webcam:', err);
+      setCameraEnabled(false);
+    }
+  };
+
+  const toggleCamera = () => {
+    if (cameraEnabled) {
+      stopCameraStream();
+      setCameraEnabled(false);
+    } else {
+      startCameraStream(selectedCameraId);
+    }
+  };
+
+  const cycleCameraPosition = () => {
+    const positions: CameraPosition[] = [
+      'bottom-right',
+      'bottom-left',
+      'top-left',
+      'top-right',
+    ];
+    const nextIdx = (positions.indexOf(cameraPosition) + 1) % positions.length;
+    setCameraPosition(positions[nextIdx]);
   };
 
   // Start preview stream when source is selected
@@ -191,6 +286,7 @@ export const Studio: React.FC<StudioProps> = ({
           mimeType,
           hasAudio: sysAudioEnabled,
           hasMic: micEnabled,
+          hasCamera: cameraEnabled,
           thumbnailUrl,
           createdAt: timestamp.toISOString(),
         };
@@ -203,7 +299,7 @@ export const Studio: React.FC<StudioProps> = ({
         setTimeout(() => setLastSaved(null), 4000);
       }
     },
-    [settings?.fps, sysAudioEnabled, micEnabled, onRecordingSaved]
+    [settings?.fps, sysAudioEnabled, micEnabled, cameraEnabled, onRecordingSaved]
   );
 
   // Start actual recording
@@ -247,6 +343,105 @@ export const Studio: React.FC<StudioProps> = ({
 
       if (!combinedStream) return;
 
+      // IF CAMERA OVERLAY IS ENABLED: Composite camera onto screen using hardware canvas
+      if (
+        cameraEnabled &&
+        cameraVideoRef.current &&
+        videoPreviewRef.current &&
+        cameraStreamRef.current
+      ) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1920;
+        canvas.height = 1080;
+        const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+
+        const screenVid = videoPreviewRef.current;
+        const camVid = cameraVideoRef.current;
+
+        const drawLoop = () => {
+          if (!ctx) return;
+          // 1. Draw base screen
+          ctx.drawImage(screenVid, 0, 0, 1920, 1080);
+
+          // 2. Draw camera overlay according to shape & position
+          const pad = 40;
+          if (cameraShape === 'circle') {
+            const diameter = 320;
+            const radius = diameter / 2;
+            let cx = 1920 - pad - radius;
+            let cy = 1080 - pad - radius;
+
+            if (cameraPosition === 'bottom-left') {
+              cx = pad + radius;
+              cy = 1080 - pad - radius;
+            } else if (cameraPosition === 'top-right') {
+              cx = 1920 - pad - radius;
+              cy = pad + radius;
+            } else if (cameraPosition === 'top-left') {
+              cx = pad + radius;
+              cy = pad + radius;
+            }
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.clip();
+            // Mirror image horizontally for natural webcam feel
+            ctx.translate(cx, cy);
+            ctx.scale(-1, 1);
+            ctx.drawImage(camVid, -radius, -radius, diameter, diameter);
+            ctx.restore();
+
+            // Accent border ring
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#6366f1';
+            ctx.stroke();
+            ctx.restore();
+          } else {
+            // Rectangle PiP
+            const w = 420;
+            const h = 236;
+            let rx = 1920 - pad - w;
+            let ry = 1080 - pad - h;
+
+            if (cameraPosition === 'bottom-left') {
+              rx = pad;
+              ry = 1080 - pad - h;
+            } else if (cameraPosition === 'top-right') {
+              rx = 1920 - pad - w;
+              ry = pad;
+            } else if (cameraPosition === 'top-left') {
+              rx = pad;
+              ry = pad;
+            }
+
+            ctx.save();
+            ctx.translate(rx + w / 2, ry + h / 2);
+            ctx.scale(-1, 1);
+            ctx.drawImage(camVid, -w / 2, -h / 2, w, h);
+            ctx.restore();
+
+            ctx.save();
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = '#6366f1';
+            ctx.strokeRect(rx, ry, w, h);
+            ctx.restore();
+          }
+
+          canvasAnimRef.current = requestAnimationFrame(drawLoop);
+        };
+
+        drawLoop();
+        const canvasStream = canvas.captureStream(settings?.fps || 60);
+        combinedStream = new MediaStream([
+          ...canvasStream.getVideoTracks(),
+          ...combinedStream.getAudioTracks(),
+        ]);
+      }
+
       recordedChunksRef.current = [];
 
       // Determine optimal mimeType
@@ -280,6 +475,10 @@ export const Studio: React.FC<StudioProps> = ({
       };
 
       recorder.onstop = async () => {
+        if (canvasAnimRef.current) {
+          cancelAnimationFrame(canvasAnimRef.current);
+          canvasAnimRef.current = null;
+        }
         setDuration((currentDur) => {
           processAndSaveRecording(selectedMime, currentDur);
           return currentDur;
@@ -304,7 +503,15 @@ export const Studio: React.FC<StudioProps> = ({
     } catch (err) {
       console.error('Error starting recording:', err);
     }
-  }, [micEnabled, settings, processAndSaveRecording, startPreviewForSource]);
+  }, [
+    micEnabled,
+    cameraEnabled,
+    cameraPosition,
+    cameraShape,
+    settings,
+    processAndSaveRecording,
+    startPreviewForSource,
+  ]);
 
   const handlePauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -327,6 +534,10 @@ export const Studio: React.FC<StudioProps> = ({
 
   const handleStopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    if (canvasAnimRef.current) {
+      cancelAnimationFrame(canvasAnimRef.current);
+      canvasAnimRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -362,7 +573,7 @@ export const Studio: React.FC<StudioProps> = ({
             </span>
           </h1>
           <p className="text-xs text-zinc-400 mt-1">
-            Zero-latency screen & window capture saving straight to local disk and SQLite.
+            Zero-latency screen & webcam capture saving straight to local disk and SQLite.
           </p>
         </div>
 
@@ -370,7 +581,9 @@ export const Studio: React.FC<StudioProps> = ({
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 font-mono">
             <span className="text-zinc-500">Record:</span>
-            <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-semibold border border-zinc-700 text-[10px]">F12</kbd>
+            <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-semibold border border-zinc-700 text-[10px]">
+              F12
+            </kbd>
           </div>
 
           <button
@@ -386,16 +599,47 @@ export const Studio: React.FC<StudioProps> = ({
       </div>
 
       {/* Main Studio Viewport */}
-      <div className="relative aspect-video w-full rounded-2xl bg-[#09090b] border border-zinc-800/90 overflow-hidden shadow-2xl flex items-center justify-center group">
+      <div className="relative aspect-video w-full rounded-2xl bg-[#09090b] border border-zinc-800/90 overflow-hidden shadow-2xl flex items-center justify-center group select-none">
+        {/* Base Screen Video */}
         <video
           ref={videoPreviewRef}
           autoPlay
           muted
           playsInline
-          className={`h-full w-full object-contain ${
-            selectedSource ? 'block' : 'hidden'
-          }`}
+          className={`h-full w-full object-contain ${selectedSource ? 'block' : 'hidden'}`}
         />
+
+        {/* Live Webcam Picture-in-Picture Overlay */}
+        {cameraEnabled && (
+          <div
+            onClick={cycleCameraPosition}
+            title="Click to cycle webcam position (Bottom-Right, Bottom-Left, Top-Left, Top-Right)"
+            className={`absolute z-20 cursor-pointer shadow-2xl transition-all duration-300 border-2 border-indigo-500 bg-zinc-950 overflow-hidden group/cam ${
+              cameraPosition === 'bottom-right'
+                ? 'bottom-5 right-5'
+                : cameraPosition === 'bottom-left'
+                ? 'bottom-5 left-5'
+                : cameraPosition === 'top-right'
+                ? 'top-5 right-5'
+                : 'top-5 left-5'
+            } ${
+              cameraShape === 'circle'
+                ? 'w-32 h-32 rounded-full'
+                : 'w-48 h-28 rounded-xl'
+            }`}
+          >
+            <video
+              ref={cameraVideoRef}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover transform -scale-x-100"
+            />
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/cam:opacity-100 transition-opacity flex items-center justify-center text-[10px] font-semibold text-white">
+              Click to Move
+            </div>
+          </div>
+        )}
 
         {!selectedSource && (
           <div className="flex flex-col items-center justify-center text-center p-8 space-y-4">
@@ -428,6 +672,12 @@ export const Studio: React.FC<StudioProps> = ({
             <span className="px-2 py-1 rounded-md bg-black/70 backdrop-blur-md text-zinc-400 text-xs font-mono border border-white/10">
               {settings?.fps || 60} FPS
             </span>
+            {cameraEnabled && (
+              <span className="px-2 py-1 rounded-md bg-indigo-950/70 backdrop-blur-md text-indigo-300 text-xs font-medium border border-indigo-500/30 flex items-center gap-1">
+                <Camera className="w-3 h-3 text-indigo-400" />
+                PiP Overlay
+              </span>
+            )}
           </div>
         )}
 
@@ -458,8 +708,8 @@ export const Studio: React.FC<StudioProps> = ({
         )}
       </div>
 
-      {/* Control Strip & Audio Toggles */}
-      <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80">
+      {/* Control Strip & Audio/Camera Toggles */}
+      <div className="relative flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80">
         {/* Left: Audio & Device Controls */}
         <div className="flex items-center gap-2">
           {/* System Audio Toggle */}
@@ -497,6 +747,129 @@ export const Studio: React.FC<StudioProps> = ({
             )}
             <span>Microphone</span>
           </button>
+
+          {/* Camera Overlay Toggle & Config */}
+          <div className="relative flex items-center">
+            <button
+              onClick={toggleCamera}
+              disabled={recordingState !== 'idle'}
+              className={`flex items-center gap-2 px-3 py-2 rounded-l-lg text-xs font-medium transition-colors border border-r-0 ${
+                cameraEnabled
+                  ? 'bg-indigo-950/60 text-indigo-300 border-indigo-700/80'
+                  : 'bg-zinc-950/60 text-zinc-500 border-zinc-800 hover:text-zinc-300'
+              }`}
+            >
+              {cameraEnabled ? (
+                <Camera className="w-4 h-4 text-indigo-400" />
+              ) : (
+                <CameraOff className="w-4 h-4" />
+              )}
+              <span>Webcam PiP</span>
+            </button>
+
+            <button
+              onClick={() => setIsCameraConfigOpen(!isCameraConfigOpen)}
+              disabled={recordingState !== 'idle'}
+              title="Camera Settings (Position & Shape)"
+              className={`p-2 rounded-r-lg text-xs border transition-colors ${
+                cameraEnabled
+                  ? 'bg-indigo-950/60 text-indigo-300 border-indigo-700/80 hover:bg-indigo-900/60'
+                  : 'bg-zinc-950/60 text-zinc-500 border-zinc-800 hover:text-zinc-300'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            {/* Camera Configuration Popover */}
+            {isCameraConfigOpen && (
+              <div className="absolute left-0 bottom-full mb-2 w-72 p-3.5 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl z-50 text-xs space-y-3 animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                  <span className="font-semibold text-zinc-200">Webcam Overlay Setup</span>
+                  <button
+                    onClick={() => setIsCameraConfigOpen(false)}
+                    className="text-zinc-500 hover:text-zinc-300"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Device Selector */}
+                <div>
+                  <label className="text-[11px] text-zinc-400 mb-1 block">Camera Device</label>
+                  <select
+                    value={selectedCameraId}
+                    onChange={(e) => {
+                      setSelectedCameraId(e.target.value);
+                      if (cameraEnabled) startCameraStream(e.target.value);
+                    }}
+                    className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded px-2 py-1.5"
+                  >
+                    {cameraDevices.map((c) => (
+                      <option key={c.deviceId} value={c.deviceId}>
+                        {c.label || 'Webcam'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Shape Selector */}
+                <div>
+                  <label className="text-[11px] text-zinc-400 mb-1 block">Overlay Shape</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setCameraShape('circle')}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 rounded border ${
+                        cameraShape === 'circle'
+                          ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500'
+                          : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                      }`}
+                    >
+                      <Circle className="w-3.5 h-3.5" />
+                      Circle
+                    </button>
+                    <button
+                      onClick={() => setCameraShape('rectangle')}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 rounded border ${
+                        cameraShape === 'rectangle'
+                          ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500'
+                          : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                      }`}
+                    >
+                      <SquareIcon className="w-3.5 h-3.5" />
+                      Rectangle
+                    </button>
+                  </div>
+                </div>
+
+                {/* Corner Position */}
+                <div>
+                  <label className="text-[11px] text-zinc-400 mb-1 block">Corner Position</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(
+                      [
+                        { id: 'top-left', label: 'Top Left' },
+                        { id: 'top-right', label: 'Top Right' },
+                        { id: 'bottom-left', label: 'Bottom Left' },
+                        { id: 'bottom-right', label: 'Bottom Right' },
+                      ] as const
+                    ).map((pos) => (
+                      <button
+                        key={pos.id}
+                        onClick={() => setCameraPosition(pos.id)}
+                        className={`py-1 rounded text-[11px] border ${
+                          cameraPosition === pos.id
+                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500'
+                            : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                        }`}
+                      >
+                        {pos.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Center: Primary Record Controls */}
@@ -548,7 +921,7 @@ export const Studio: React.FC<StudioProps> = ({
         <div className="flex items-center gap-3 text-xs text-zinc-400">
           <span className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-400">
             <Sparkles className="w-3 h-3 text-indigo-400" />
-            Hardware VP8/WebM
+            {cameraEnabled ? 'Composited PiP' : 'Hardware Direct'}
           </span>
         </div>
       </div>
