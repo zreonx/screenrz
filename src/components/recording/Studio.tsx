@@ -89,16 +89,23 @@ export const Studio: React.FC<StudioProps> = ({
     }
   }, [settings]);
 
-  // Enumerate cameras
-  useEffect(() => {
-    navigator.mediaDevices?.enumerateDevices?.().then((devices) => {
+  const refreshCameraDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
       const cams = devices.filter((d) => d.kind === 'videoinput');
       setCameraDevices(cams);
       if (cams.length > 0 && !selectedCameraId) {
         setSelectedCameraId(cams[0].deviceId);
       }
-    }).catch(() => {});
+    } catch (e) {
+      console.warn('Could not enumerate cameras:', e);
+    }
   }, [selectedCameraId]);
+
+  // Enumerate cameras on mount
+  useEffect(() => {
+    refreshCameraDevices();
+  }, [refreshCameraDevices]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -121,6 +128,25 @@ export const Studio: React.FC<StudioProps> = ({
       }
     }
   }, [isActive]);
+
+  // Callback ref to guarantee immediate srcObject attachment on mount
+  const setCameraVideoNode = useCallback((node: HTMLVideoElement | null) => {
+    cameraVideoRef.current = node;
+    if (node && cameraStreamRef.current) {
+      node.srcObject = cameraStreamRef.current;
+      node.play().catch((err) => console.warn('Camera video play error:', err));
+    }
+  }, []);
+
+  // Guarantee stream attachment whenever cameraEnabled toggles
+  useEffect(() => {
+    if (cameraEnabled && cameraStreamRef.current && cameraVideoRef.current) {
+      if (cameraVideoRef.current.srcObject !== cameraStreamRef.current) {
+        cameraVideoRef.current.srcObject = cameraStreamRef.current;
+        cameraVideoRef.current.play().catch(() => {});
+      }
+    }
+  }, [cameraEnabled]);
 
   const stopPreviewStream = () => {
     if (mediaStreamRef.current) {
@@ -145,19 +171,29 @@ export const Studio: React.FC<StudioProps> = ({
   const startCameraStream = async (deviceId?: string) => {
     stopCameraStream();
     try {
-      const constraints: MediaStreamConstraints = {
-        video: deviceId
-          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          : { width: { ideal: 1280 }, height: { ideal: 720 } },
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream;
+      try {
+        const constraints: MediaStreamConstraints = {
+          video: deviceId
+            ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { width: { ideal: 1280 }, height: { ideal: 720 } },
+        };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (exactErr) {
+        console.warn('Specific camera constraint failed, using general video:', exactErr);
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+
       cameraStreamRef.current = stream;
+      setCameraEnabled(true);
+
       if (cameraVideoRef.current) {
         cameraVideoRef.current.srcObject = stream;
         cameraVideoRef.current.play().catch(() => {});
       }
-      setCameraEnabled(true);
-    } catch (err) {
+
+      refreshCameraDevices();
+    } catch (err: any) {
       console.warn('Failed to start webcam:', err);
       setCameraEnabled(false);
     }
@@ -363,72 +399,74 @@ export const Studio: React.FC<StudioProps> = ({
           // 1. Draw base screen
           ctx.drawImage(screenVid, 0, 0, 1920, 1080);
 
-          // 2. Draw camera overlay according to shape & position
-          const pad = 40;
-          if (cameraShape === 'circle') {
-            const diameter = 320;
-            const radius = diameter / 2;
-            let cx = 1920 - pad - radius;
-            let cy = 1080 - pad - radius;
+          // 2. Draw camera overlay according to shape & position if video has frame data
+          if (camVid && camVid.readyState >= 2) {
+            const pad = 40;
+            if (cameraShape === 'circle') {
+              const diameter = 320;
+              const radius = diameter / 2;
+              let cx = 1920 - pad - radius;
+              let cy = 1080 - pad - radius;
 
-            if (cameraPosition === 'bottom-left') {
-              cx = pad + radius;
-              cy = 1080 - pad - radius;
-            } else if (cameraPosition === 'top-right') {
-              cx = 1920 - pad - radius;
-              cy = pad + radius;
-            } else if (cameraPosition === 'top-left') {
-              cx = pad + radius;
-              cy = pad + radius;
+              if (cameraPosition === 'bottom-left') {
+                cx = pad + radius;
+                cy = 1080 - pad - radius;
+              } else if (cameraPosition === 'top-right') {
+                cx = 1920 - pad - radius;
+                cy = pad + radius;
+              } else if (cameraPosition === 'top-left') {
+                cx = pad + radius;
+                cy = pad + radius;
+              }
+
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+              ctx.clip();
+              // Mirror image horizontally for natural webcam feel
+              ctx.translate(cx, cy);
+              ctx.scale(-1, 1);
+              ctx.drawImage(camVid, -radius, -radius, diameter, diameter);
+              ctx.restore();
+
+              // Accent border ring
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+              ctx.lineWidth = 6;
+              ctx.strokeStyle = '#6366f1';
+              ctx.stroke();
+              ctx.restore();
+            } else {
+              // Rectangle PiP
+              const w = 420;
+              const h = 236;
+              let rx = 1920 - pad - w;
+              let ry = 1080 - pad - h;
+
+              if (cameraPosition === 'bottom-left') {
+                rx = pad;
+                ry = 1080 - pad - h;
+              } else if (cameraPosition === 'top-right') {
+                rx = 1920 - pad - w;
+                ry = pad;
+              } else if (cameraPosition === 'top-left') {
+                rx = pad;
+                ry = pad;
+              }
+
+              ctx.save();
+              ctx.translate(rx + w / 2, ry + h / 2);
+              ctx.scale(-1, 1);
+              ctx.drawImage(camVid, -w / 2, -h / 2, w, h);
+              ctx.restore();
+
+              ctx.save();
+              ctx.lineWidth = 5;
+              ctx.strokeStyle = '#6366f1';
+              ctx.strokeRect(rx, ry, w, h);
+              ctx.restore();
             }
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.clip();
-            // Mirror image horizontally for natural webcam feel
-            ctx.translate(cx, cy);
-            ctx.scale(-1, 1);
-            ctx.drawImage(camVid, -radius, -radius, diameter, diameter);
-            ctx.restore();
-
-            // Accent border ring
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.lineWidth = 6;
-            ctx.strokeStyle = '#6366f1';
-            ctx.stroke();
-            ctx.restore();
-          } else {
-            // Rectangle PiP
-            const w = 420;
-            const h = 236;
-            let rx = 1920 - pad - w;
-            let ry = 1080 - pad - h;
-
-            if (cameraPosition === 'bottom-left') {
-              rx = pad;
-              ry = 1080 - pad - h;
-            } else if (cameraPosition === 'top-right') {
-              rx = 1920 - pad - w;
-              ry = pad;
-            } else if (cameraPosition === 'top-left') {
-              rx = pad;
-              ry = pad;
-            }
-
-            ctx.save();
-            ctx.translate(rx + w / 2, ry + h / 2);
-            ctx.scale(-1, 1);
-            ctx.drawImage(camVid, -w / 2, -h / 2, w, h);
-            ctx.restore();
-
-            ctx.save();
-            ctx.lineWidth = 5;
-            ctx.strokeStyle = '#6366f1';
-            ctx.strokeRect(rx, ry, w, h);
-            ctx.restore();
           }
 
           canvasAnimRef.current = requestAnimationFrame(drawLoop);
@@ -629,11 +667,11 @@ export const Studio: React.FC<StudioProps> = ({
             }`}
           >
             <video
-              ref={cameraVideoRef}
+              ref={setCameraVideoNode}
               autoPlay
               muted
               playsInline
-              className="w-full h-full object-cover transform -scale-x-100"
+              className="w-full h-full object-cover transform -scale-x-100 bg-black"
             />
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/cam:opacity-100 transition-opacity flex items-center justify-center text-[10px] font-semibold text-white">
               Click to Move
@@ -802,13 +840,17 @@ export const Studio: React.FC<StudioProps> = ({
                       setSelectedCameraId(e.target.value);
                       if (cameraEnabled) startCameraStream(e.target.value);
                     }}
-                    className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded px-2 py-1.5"
+                    className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded px-2 py-1.5 focus:outline-hidden"
                   >
-                    {cameraDevices.map((c) => (
-                      <option key={c.deviceId} value={c.deviceId}>
-                        {c.label || 'Webcam'}
-                      </option>
-                    ))}
+                    {cameraDevices.length === 0 ? (
+                      <option value="">Default Integrated Camera</option>
+                    ) : (
+                      cameraDevices.map((c, i) => (
+                        <option key={c.deviceId || i} value={c.deviceId}>
+                          {c.label || `Camera ${i + 1}`}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
