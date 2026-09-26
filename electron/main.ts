@@ -9,10 +9,25 @@ import {
   Tray,
   Menu,
   nativeImage,
+  protocol,
 } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { LocalDatabase } from './database';
+
+// Register privileged local media protocol for hardware-accelerated video streaming
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'media',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: true,
+    },
+  },
+]);
 
 // Bandicam-like performance optimization flags
 app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder');
@@ -319,6 +334,81 @@ ipcMain.handle('db:delete-recording', async (_event, { id, deleteFile }) => {
 
 // Application lifecycle & Global Bandicam Hotkeys
 app.whenReady().then(() => {
+  // Register high-performance local media streaming protocol with HTTP 206 Byte Range support
+  protocol.handle('media', (request) => {
+    try {
+      const url = new URL(request.url);
+      let filePath = decodeURIComponent(url.pathname);
+      if (process.platform === 'win32' && filePath.startsWith('/')) {
+        filePath = filePath.slice(1);
+      }
+
+      if (!fs.existsSync(filePath)) {
+        return new Response('Media file not found', { status: 404 });
+      }
+
+      const stat = fs.statSync(filePath);
+      const fileSize = stat.size;
+      const range = request.headers.get('range');
+
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+
+        const fileStream = fs.createReadStream(filePath, { start, end });
+        const nodeStream = fileStream as any;
+
+        const readableStream = new ReadableStream({
+          start(controller) {
+            nodeStream.on('data', (chunk: Buffer) => controller.enqueue(chunk));
+            nodeStream.on('end', () => controller.close());
+            nodeStream.on('error', (err: any) => controller.error(err));
+          },
+          cancel() {
+            fileStream.destroy();
+          },
+        });
+
+        return new Response(readableStream, {
+          status: 206,
+          headers: {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize.toString(),
+            'Content-Type': 'video/webm',
+          },
+        });
+      }
+
+      const fileStream = fs.createReadStream(filePath);
+      const nodeStream = fileStream as any;
+      const readableStream = new ReadableStream({
+        start(controller) {
+          nodeStream.on('data', (chunk: Buffer) => controller.enqueue(chunk));
+          nodeStream.on('end', () => controller.close());
+          nodeStream.on('error', (err: any) => controller.error(err));
+        },
+        cancel() {
+          fileStream.destroy();
+        },
+      });
+
+      return new Response(readableStream, {
+        status: 200,
+        headers: {
+          'Accept-Ranges': 'bytes',
+          'Content-Length': fileSize.toString(),
+          'Content-Type': 'video/webm',
+        },
+      });
+    } catch (e: any) {
+      console.error('Error serving media stream:', e);
+      return new Response(e.message, { status: 500 });
+    }
+  });
+
   createWindow();
 
   // Bandicam Global Shortcuts:
