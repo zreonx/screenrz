@@ -171,12 +171,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Auto Minimize (Bandicam Mode) */}
-        <div className="flex items-center justify-between py-2">
+        <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
           <div className="flex items-center gap-2.5">
             <Minimize2 className="w-4 h-4 text-zinc-400" />
             <div>
-              <div className="text-xs font-medium text-zinc-200">Auto-Minimize Window (Bandicam Mode)</div>
-              <div className="text-[11px] text-zinc-500">Automatically minimize Screenrz to taskbar when recording starts for 0% UI lag.</div>
+              <div className="text-xs font-medium text-zinc-200">Auto-Minimize on Record (Bandicam Mode)</div>
+              <div className="text-[11px] text-zinc-500">Automatically drop to background when recording starts for 0% UI lag.</div>
             </div>
           </div>
           <button
@@ -188,6 +188,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div
               className={`w-5 h-5 rounded-full bg-white transition-transform ${
                 settings?.autoMinimizeOnRecord ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Minimize to Windows System Tray / Status Bar */}
+        <div className="flex items-center justify-between py-2">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-indigo-400" />
+            <div>
+              <div className="text-xs font-medium text-zinc-200">Minimize to Windows System Tray</div>
+              <div className="text-[11px] text-zinc-500">Hide from taskbar and live in the Windows notification status area next to the clock.</div>
+            </div>
+          </div>
+          <button
+            onClick={() => onUpdateSettings({ minimizeToTray: !settings?.minimizeToTray })}
+            className={`w-10 h-6 rounded-full transition-colors relative flex items-center px-0.5 ${
+              settings?.minimizeToTray ? 'bg-indigo-600' : 'bg-zinc-800'
+            }`}
+          >
+            <div
+              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                settings?.minimizeToTray ? 'translate-x-4' : 'translate-x-0'
               }`}
             />
           </button>

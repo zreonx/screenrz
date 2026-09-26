@@ -8,6 +8,7 @@ export interface AppSettings {
   includeAudio: boolean;
   theme: 'dark' | 'light';
   autoMinimizeOnRecord: boolean;
+  minimizeToTray: boolean;
 }
 
 export interface RecordingItem {
@@ -62,7 +63,9 @@ const electronAPI = {
   deleteRecordingRecord: (id: string, deleteFile = false) =>
     ipcRenderer.invoke('db:delete-recording', { id, deleteFile }),
 
-  // Bandicam System-Wide Hotkey Listeners
+  // Windows System Tray Status & Hotkeys
+  updateTrayState: (isRecording: boolean, durationText?: string) =>
+    ipcRenderer.send('tray:update-state', { isRecording, durationText }),
   onHotkeyToggleRecord: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('hotkey:toggle-record', handler);

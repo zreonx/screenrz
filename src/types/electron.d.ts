@@ -6,6 +6,7 @@ export interface AppSettings {
   includeAudio: boolean;
   theme: 'dark' | 'light';
   autoMinimizeOnRecord: boolean;
+  minimizeToTray: boolean;
 }
 
 export interface RecordingItem {
@@ -61,7 +62,8 @@ export interface ElectronAPI {
   saveRecordingRecord: (item: RecordingItem) => Promise<boolean>;
   deleteRecordingRecord: (id: string, deleteFile?: boolean) => Promise<boolean>;
 
-  // Bandicam System-Wide Hotkey Listeners
+  // Windows System Tray Status & Hotkeys
+  updateTrayState: (isRecording: boolean, durationText?: string) => void;
   onHotkeyToggleRecord: (callback: () => void) => () => void;
   onHotkeyTogglePause: (callback: () => void) => () => void;
 }

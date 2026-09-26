@@ -107,6 +107,9 @@ export function App() {
     (state: 'idle' | 'recording' | 'paused', duration: number) => {
       setRecordingState(state);
       setRecordingDuration(duration);
+      if (window.electronAPI?.updateTrayState) {
+        window.electronAPI.updateTrayState(state !== 'idle', formatDuration(duration));
+      }
     },
     []
   );

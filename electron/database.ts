@@ -10,6 +10,7 @@ export interface AppSettings {
   includeAudio: boolean;
   theme: 'dark' | 'light';
   autoMinimizeOnRecord: boolean;
+  minimizeToTray: boolean;
 }
 
 export interface RecordingRecord {
@@ -115,6 +116,7 @@ export class LocalDatabase {
       this.saveSetting('includeAudio', '1');
       this.saveSetting('theme', 'dark');
       this.saveSetting('autoMinimizeOnRecord', '0');
+      this.saveSetting('minimizeToTray', '1');
     }
   }
 
@@ -128,6 +130,7 @@ export class LocalDatabase {
       includeAudio: true,
       theme: 'dark',
       autoMinimizeOnRecord: false,
+      minimizeToTray: true,
     };
 
     if (this.useJsonFallback) {
@@ -156,6 +159,7 @@ export class LocalDatabase {
         includeAudio: map.includeAudio === '1',
         theme: (map.theme as any) || defaults.theme,
         autoMinimizeOnRecord: map.autoMinimizeOnRecord === '1',
+        minimizeToTray: map.minimizeToTray !== undefined ? map.minimizeToTray === '1' : true,
       };
     } catch (e) {
       console.error('[SQLite] Error reading settings:', e);
