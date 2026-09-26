@@ -6,7 +6,8 @@ import {
   Sliders,
   Check,
   Minimize2,
-  Tv,
+  Keyboard,
+  Sparkles,
 } from 'lucide-react';
 import { AppSettings } from '@/types/electron';
 
@@ -83,7 +84,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       </div>
 
-      {/* SECTION 2: Video Performance & FPS */}
+      {/* SECTION 2: Global Bandicam-style Hotkeys */}
+      <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+            <Keyboard className="w-4 h-4 text-indigo-400" />
+            <h3>Global Background Hotkeys</h3>
+          </div>
+          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+            <Sparkles className="w-3 h-3" />
+            Active Anywhere
+          </span>
+        </div>
+        <p className="text-xs text-zinc-400 leading-relaxed">
+          Record seamlessly in background games and applications without switching back to Screenrz.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-950 border border-zinc-800/80">
+            <span className="text-xs text-zinc-300 font-medium">Start / Stop Recording</span>
+            <kbd className="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs font-mono font-semibold text-indigo-300 shadow-xs">
+              F12
+            </kbd>
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-950 border border-zinc-800/80">
+            <span className="text-xs text-zinc-300 font-medium">Pause / Resume Recording</span>
+            <kbd className="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs font-mono font-semibold text-indigo-300 shadow-xs">
+              Shift + F12
+            </kbd>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 3: Video Performance & FPS */}
       <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
           <Sliders className="w-4 h-4 text-indigo-400" />
@@ -136,13 +170,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        {/* Auto Minimize */}
+        {/* Auto Minimize (Bandicam Mode) */}
         <div className="flex items-center justify-between py-2">
           <div className="flex items-center gap-2.5">
             <Minimize2 className="w-4 h-4 text-zinc-400" />
             <div>
-              <div className="text-xs font-medium text-zinc-200">Auto-Minimize Window</div>
-              <div className="text-[11px] text-zinc-500">Automatically minimize Screenrz to taskbar when recording starts.</div>
+              <div className="text-xs font-medium text-zinc-200">Auto-Minimize Window (Bandicam Mode)</div>
+              <div className="text-[11px] text-zinc-500">Automatically minimize Screenrz to taskbar when recording starts for 0% UI lag.</div>
             </div>
           </div>
           <button
@@ -160,7 +194,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       </div>
 
-      {/* SECTION 3: Local SQLite Engine Status */}
+      {/* SECTION 4: Local SQLite Engine Status */}
       <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
           <Database className="w-4 h-4 text-emerald-400" />

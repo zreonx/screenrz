@@ -60,6 +60,10 @@ export interface ElectronAPI {
   getRecordings: () => Promise<RecordingItem[]>;
   saveRecordingRecord: (item: RecordingItem) => Promise<boolean>;
   deleteRecordingRecord: (id: string, deleteFile?: boolean) => Promise<boolean>;
+
+  // Bandicam System-Wide Hotkey Listeners
+  onHotkeyToggleRecord: (callback: () => void) => () => void;
+  onHotkeyTogglePause: (callback: () => void) => () => void;
 }
 
 declare global {

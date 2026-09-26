@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, desktopCapturer } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, desktopCapturer, globalShortcut } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { LocalDatabase } from './database';
@@ -181,15 +181,36 @@ ipcMain.handle('db:delete-recording', async (_event, { id, deleteFile }) => {
   return db.deleteRecording(id);
 });
 
-// Application lifecycle
+// Application lifecycle & Global Bandicam Hotkeys
 app.whenReady().then(() => {
   createWindow();
+
+  // Bandicam Global Shortcuts:
+  // F12 -> Toggle Start / Stop Recording
+  // Shift+F12 -> Toggle Pause / Resume Recording
+  try {
+    globalShortcut.register('F12', () => {
+      mainWindow?.webContents.send('hotkey:toggle-record');
+    });
+
+    globalShortcut.register('Shift+F12', () => {
+      mainWindow?.webContents.send('hotkey:toggle-pause');
+    });
+
+    console.log('[Hotkeys] Registered F12 (Record/Stop) and Shift+F12 (Pause/Resume)');
+  } catch (err) {
+    console.warn('[Hotkeys] Failed to register global shortcuts:', err);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', () => {

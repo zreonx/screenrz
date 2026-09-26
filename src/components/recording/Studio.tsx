@@ -90,7 +90,7 @@ export const Studio: React.FC<StudioProps> = ({
 
   // Start preview stream when source is selected
   const startPreviewForSource = useCallback(
-    async (source: DesktopCapturerSource) => {
+    async (source: DesktopCapturerSource): Promise<MediaStream | null> => {
       stopPreviewStream();
       try {
         const stream = await (navigator.mediaDevices as any).getUserMedia({
@@ -116,8 +116,10 @@ export const Studio: React.FC<StudioProps> = ({
           videoPreviewRef.current.srcObject = stream;
           videoPreviewRef.current.play().catch(() => {});
         }
+        return stream;
       } catch (err) {
         console.error('Failed to get media stream for source:', err);
+        return null;
       }
     },
     [sysAudioEnabled, settings?.fps]
@@ -127,6 +129,19 @@ export const Studio: React.FC<StudioProps> = ({
     setSelectedSource(source);
     startPreviewForSource(source);
   };
+
+  // Auto-detect and initialize primary display on load (Bandicam default)
+  useEffect(() => {
+    if (window.electronAPI?.getSources && !selectedSource) {
+      window.electronAPI.getSources().then((sources) => {
+        const primary = sources.find((s) => s.id.startsWith('screen:')) || sources[0];
+        if (primary && !selectedSource) {
+          setSelectedSource(primary);
+          startPreviewForSource(primary);
+        }
+      }).catch(() => {});
+    }
+  }, [startPreviewForSource, selectedSource]);
 
   // Convert chunks, generate thumbnail, save file and write to SQLite
   const processAndSaveRecording = useCallback(
@@ -193,13 +208,27 @@ export const Studio: React.FC<StudioProps> = ({
 
   // Start actual recording
   const handleStartRecording = useCallback(async () => {
-    if (!selectedSource && !mediaStreamRef.current) {
+    let activeStream = mediaStreamRef.current;
+
+    // Auto-discover primary display if not ready
+    if (!activeStream) {
+      if (window.electronAPI?.getSources) {
+        const sources = await window.electronAPI.getSources();
+        const primary = sources.find((s) => s.id.startsWith('screen:')) || sources[0];
+        if (primary) {
+          setSelectedSource(primary);
+          activeStream = await startPreviewForSource(primary);
+        }
+      }
+    }
+
+    if (!activeStream) {
       setIsPickerOpen(true);
       return;
     }
 
     try {
-      let combinedStream = mediaStreamRef.current;
+      let combinedStream = activeStream;
 
       // If mic is enabled, combine with mic audio
       if (micEnabled) {
@@ -268,14 +297,14 @@ export const Studio: React.FC<StudioProps> = ({
         setDuration((prev) => prev + 1);
       }, 1000);
 
-      // Auto minimize if configured
+      // Auto minimize if configured (Bandicam mode)
       if (settings?.autoMinimizeOnRecord) {
         window.electronAPI?.minimizeWindow();
       }
     } catch (err) {
       console.error('Error starting recording:', err);
     }
-  }, [selectedSource, micEnabled, settings, processAndSaveRecording]);
+  }, [micEnabled, settings, processAndSaveRecording, startPreviewForSource]);
 
   const handlePauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -304,7 +333,7 @@ export const Studio: React.FC<StudioProps> = ({
     setRecordingState('idle');
   }, []);
 
-  // Expose controls to parent component for global control pill
+  // Expose controls to parent component for global control pill & F12 hotkey
   useEffect(() => {
     if (controlsRef) {
       controlsRef.current = {
@@ -337,14 +366,19 @@ export const Studio: React.FC<StudioProps> = ({
           </p>
         </div>
 
-        {/* Destination Path pill */}
+        {/* Hotkey hint + Destination Path */}
         <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 font-mono">
+            <span className="text-zinc-500">Record:</span>
+            <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-semibold border border-zinc-700 text-[10px]">F12</kbd>
+          </div>
+
           <button
             onClick={onOpenSettings}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors"
           >
             <FolderOpen className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="max-w-[200px] truncate">
+            <span className="max-w-[180px] truncate">
               {settings?.outputDirectory ? settings.outputDirectory.split('\\').pop() : 'Output folder'}
             </span>
           </button>
@@ -369,9 +403,9 @@ export const Studio: React.FC<StudioProps> = ({
               <Monitor className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-zinc-200">No Source Selected</h3>
+              <h3 className="text-sm font-semibold text-zinc-200">Initializing Display Capture</h3>
               <p className="text-xs text-zinc-500 mt-1 max-w-sm">
-                Choose a display monitor or specific app window to begin high-efficiency recording.
+                Detecting local display monitors and windows...
               </p>
             </div>
             <button
@@ -474,13 +508,14 @@ export const Studio: React.FC<StudioProps> = ({
             >
               <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
               Start Recording
+              <span className="ml-1 text-[10px] opacity-75 font-mono">(F12)</span>
             </button>
           ) : (
             <div className="flex items-center gap-2">
               {recordingState === 'recording' ? (
                 <button
                   onClick={handlePauseRecording}
-                  title="Pause recording"
+                  title="Pause recording (Shift+F12)"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition-colors"
                 >
                   <Pause className="w-3.5 h-3.5" />
@@ -489,7 +524,7 @@ export const Studio: React.FC<StudioProps> = ({
               ) : (
                 <button
                   onClick={handleResumeRecording}
-                  title="Resume recording"
+                  title="Resume recording (Shift+F12)"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shadow-md transition-colors"
                 >
                   <Play className="w-3.5 h-3.5" />
@@ -499,6 +534,7 @@ export const Studio: React.FC<StudioProps> = ({
 
               <button
                 onClick={handleStopRecording}
+                title="Stop recording (F12)"
                 className="flex items-center gap-2 px-5 py-2 rounded-lg bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-semibold shadow-md transition-colors"
               >
                 <Square className="w-3.5 h-3.5 fill-current" />

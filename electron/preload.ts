@@ -61,6 +61,22 @@ const electronAPI = {
   saveRecordingRecord: (item: RecordingItem) => ipcRenderer.invoke('db:save-recording', item),
   deleteRecordingRecord: (id: string, deleteFile = false) =>
     ipcRenderer.invoke('db:delete-recording', { id, deleteFile }),
+
+  // Bandicam System-Wide Hotkey Listeners
+  onHotkeyToggleRecord: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('hotkey:toggle-record', handler);
+    return () => {
+      ipcRenderer.removeListener('hotkey:toggle-record', handler);
+    };
+  },
+  onHotkeyTogglePause: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('hotkey:toggle-pause', handler);
+    return () => {
+      ipcRenderer.removeListener('hotkey:toggle-pause', handler);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

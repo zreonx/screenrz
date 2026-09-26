@@ -51,6 +51,38 @@ export function App() {
     loadData();
   }, [loadData]);
 
+  // Listen for Bandicam-style Global Shortcuts (F12 / Shift+F12)
+  useEffect(() => {
+    if (!window.electronAPI?.onHotkeyToggleRecord) return;
+
+    const unbindRecord = window.electronAPI.onHotkeyToggleRecord(() => {
+      setRecordingState((currentState) => {
+        if (currentState === 'idle') {
+          studioControlsRef.current?.start();
+        } else {
+          studioControlsRef.current?.stop();
+        }
+        return currentState;
+      });
+    });
+
+    const unbindPause = window.electronAPI.onHotkeyTogglePause(() => {
+      setRecordingState((currentState) => {
+        if (currentState === 'recording') {
+          studioControlsRef.current?.pause();
+        } else if (currentState === 'paused') {
+          studioControlsRef.current?.resume();
+        }
+        return currentState;
+      });
+    });
+
+    return () => {
+      unbindRecord?.();
+      unbindPause?.();
+    };
+  }, []);
+
   const handleUpdateSettings = async (newSettings: Partial<AppSettings>) => {
     if (window.electronAPI) {
       await window.electronAPI.saveSettings(newSettings);
@@ -119,7 +151,7 @@ export function App() {
                   <button
                     onClick={() => studioControlsRef.current?.pause()}
                     className="p-1 rounded-md hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
-                    title="Pause"
+                    title="Pause (Shift+F12)"
                   >
                     <Pause className="w-3.5 h-3.5" />
                   </button>
@@ -127,7 +159,7 @@ export function App() {
                   <button
                     onClick={() => studioControlsRef.current?.resume()}
                     className="p-1 rounded-md hover:bg-zinc-800 text-indigo-400 hover:text-indigo-300 transition-colors"
-                    title="Resume"
+                    title="Resume (Shift+F12)"
                   >
                     <Play className="w-3.5 h-3.5" />
                   </button>
@@ -136,7 +168,7 @@ export function App() {
                 <button
                   onClick={() => studioControlsRef.current?.stop()}
                   className="p-1 rounded-md hover:bg-rose-950 text-rose-400 hover:text-rose-200 transition-colors"
-                  title="Finish & Save"
+                  title="Finish & Save (F12)"
                 >
                   <Square className="w-3.5 h-3.5 fill-current" />
                 </button>
