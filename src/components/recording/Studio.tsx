@@ -80,6 +80,7 @@ export const Studio: React.FC<StudioProps> = ({
   const bgIntervalRef = useRef<any>(null);
   const compositorRef = useRef<VideoCompositor | null>(null);
   const isProcessingRef = useRef<boolean>(false);
+  const isRecordingRef = useRef<boolean>(false);
   const durationRef = useRef<number>(0);
 
   // Keep durationRef synchronized
@@ -399,6 +400,7 @@ export const Studio: React.FC<StudioProps> = ({
   // Start actual recording
   const handleStartRecording = useCallback(async () => {
     isProcessingRef.current = false;
+    isRecordingRef.current = true;
     durationRef.current = 0;
 
     let activeStream = mediaStreamRef.current;
@@ -489,21 +491,19 @@ export const Studio: React.FC<StudioProps> = ({
 
           // Render loop driven by requestAnimationFrame (instant GPU draw in microseconds)
           const renderLoop = () => {
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-              compositor.render();
-              lastFrameTime = performance.now();
-              canvasAnimRef.current = requestAnimationFrame(renderLoop);
-            }
+            if (!isRecordingRef.current) return;
+            compositor.render();
+            lastFrameTime = performance.now();
+            canvasAnimRef.current = requestAnimationFrame(renderLoop);
           };
 
           // Background safety interval: guarantees 60 FPS even if minimized to Windows Tray
           const bgFallbackInterval = setInterval(() => {
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-              const now = performance.now();
-              if (now - lastFrameTime >= frameDuration * 1.5) {
-                compositor.render();
-                lastFrameTime = now;
-              }
+            if (!isRecordingRef.current) return;
+            const now = performance.now();
+            if (now - lastFrameTime >= 25) {
+              compositor.render();
+              lastFrameTime = now;
             }
           }, frameDuration);
 
@@ -552,6 +552,7 @@ export const Studio: React.FC<StudioProps> = ({
       };
 
       recorder.onstop = async () => {
+        isRecordingRef.current = false;
         if (canvasAnimRef.current) {
           cancelAnimationFrame(canvasAnimRef.current);
           canvasAnimRef.current = null;
@@ -599,6 +600,7 @@ export const Studio: React.FC<StudioProps> = ({
   const handlePauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.pause();
+      isRecordingRef.current = false;
       setRecordingState('paused');
       if (timerRef.current) clearInterval(timerRef.current);
     }
@@ -608,14 +610,24 @@ export const Studio: React.FC<StudioProps> = ({
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
       mediaRecorderRef.current.resume();
       setRecordingState('recording');
+      isRecordingRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setDuration((prev) => prev + 1);
       }, 1000);
+      if (compositorRef.current && !canvasAnimRef.current) {
+        const renderLoop = () => {
+          if (!isRecordingRef.current) return;
+          compositorRef.current?.render();
+          canvasAnimRef.current = requestAnimationFrame(renderLoop);
+        };
+        canvasAnimRef.current = requestAnimationFrame(renderLoop);
+      }
     }
   }, []);
 
   const handleStopRecording = useCallback(() => {
+    isRecordingRef.current = false;
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
