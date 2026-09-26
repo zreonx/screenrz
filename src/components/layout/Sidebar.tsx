@@ -20,6 +20,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   settings: AppSettings | null;
   recordingCount: number;
+  isRecording?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   settings,
   recordingCount,
+  isRecording = false,
 }) => {
   const navItems = [
     {
@@ -91,6 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
+            const isStudioRec = item.id === 'studio' && isRecording;
 
             return (
               <button
@@ -104,16 +107,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
                 )}
               >
-                <Icon
-                  className={cn(
-                    'w-4 h-4 transition-colors flex-shrink-0',
-                    isActive ? 'text-indigo-400' : 'text-zinc-400 group-hover:text-zinc-200'
+                <div className="relative flex items-center justify-center">
+                  <Icon
+                    className={cn(
+                      'w-4 h-4 transition-colors flex-shrink-0',
+                      isActive ? 'text-indigo-400' : 'text-zinc-400 group-hover:text-zinc-200'
+                    )}
+                  />
+                  {isStudioRec && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 animate-pulse ring-2 ring-[#09090b]" />
                   )}
-                />
+                </div>
+
                 {!collapsed && (
                   <span className="flex-1 text-left truncate">{item.label}</span>
                 )}
-                {!collapsed && item.badge !== null && (
+
+                {!collapsed && isStudioRec && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse">
+                    REC
+                  </span>
+                )}
+
+                {!collapsed && !isStudioRec && item.badge !== null && (
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-zinc-700/60 text-zinc-300">
                     {item.badge}
                   </span>

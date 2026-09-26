@@ -17,16 +17,29 @@ import { AppSettings, DesktopCapturerSource, RecordingItem } from '@/types/elect
 import { formatDuration } from '@/lib/utils';
 import { SourcePickerModal } from './SourcePickerModal';
 
+export interface StudioControls {
+  pause: () => void;
+  resume: () => void;
+  stop: () => void;
+  start: () => void;
+}
+
 interface StudioProps {
   settings: AppSettings | null;
   onRecordingSaved: () => void;
   onOpenSettings: () => void;
+  onRecordingStateChange?: (state: 'idle' | 'recording' | 'paused', duration: number) => void;
+  controlsRef?: React.MutableRefObject<StudioControls | null>;
+  isActive?: boolean;
 }
 
 export const Studio: React.FC<StudioProps> = ({
   settings,
   onRecordingSaved,
   onOpenSettings,
+  onRecordingStateChange,
+  controlsRef,
+  isActive = true,
 }) => {
   const [selectedSource, setSelectedSource] = useState<DesktopCapturerSource | null>(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -57,6 +70,13 @@ export const Studio: React.FC<StudioProps> = ({
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  // When tab becomes active again, ensure video preview is playing
+  useEffect(() => {
+    if (isActive && videoPreviewRef.current && mediaStreamRef.current) {
+      videoPreviewRef.current.play().catch(() => {});
+    }
+  }, [isActive]);
 
   const stopPreviewStream = () => {
     if (mediaStreamRef.current) {
@@ -108,8 +128,71 @@ export const Studio: React.FC<StudioProps> = ({
     startPreviewForSource(source);
   };
 
+  // Convert chunks, generate thumbnail, save file and write to SQLite
+  const processAndSaveRecording = useCallback(
+    async (mimeType: string, finalDuration: number) => {
+      const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+      if (blob.size === 0) return;
+
+      const buffer = new Uint8Array(await blob.arrayBuffer());
+      const timestamp = new Date();
+      const formattedDate = timestamp
+        .toISOString()
+        .replace(/T/, '_')
+        .replace(/:/g, '-')
+        .split('.')[0];
+      const fileName = `Screenrz_${formattedDate}.webm`;
+
+      // Save directly to user's disk directory via Electron
+      const saveResult = await window.electronAPI.saveRecordingFile(fileName, buffer);
+
+      if (saveResult && saveResult.success) {
+        // Capture thumbnail from video
+        let thumbnailUrl: string | undefined = undefined;
+        if (videoPreviewRef.current) {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 320;
+            canvas.height = 180;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(videoPreviewRef.current, 0, 0, 320, 180);
+              thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
+            }
+          } catch {}
+        }
+
+        // Record in local SQLite database
+        const item: RecordingItem = {
+          id: `rec_${Date.now()}`,
+          title: `Recording ${formattedDate}`,
+          fileName,
+          filePath: saveResult.filePath,
+          fileSize: saveResult.size,
+          durationSeconds: finalDuration,
+          width: 1920,
+          height: 1080,
+          fps: settings?.fps || 60,
+          mimeType,
+          hasAudio: sysAudioEnabled,
+          hasMic: micEnabled,
+          thumbnailUrl,
+          createdAt: timestamp.toISOString(),
+        };
+
+        await window.electronAPI.saveRecordingRecord(item);
+        setLastSaved(saveResult.filePath);
+        onRecordingSaved();
+
+        // Clear notification after 4 seconds
+        setTimeout(() => setLastSaved(null), 4000);
+      }
+    },
+    [settings?.fps, sysAudioEnabled, micEnabled, onRecordingSaved]
+  );
+
   // Start actual recording
-  const handleStartRecording = async () => {
+  const handleStartRecording = useCallback(async () => {
     if (!selectedSource && !mediaStreamRef.current) {
       setIsPickerOpen(true);
       return;
@@ -168,7 +251,10 @@ export const Studio: React.FC<StudioProps> = ({
       };
 
       recorder.onstop = async () => {
-        await processAndSaveRecording(selectedMime);
+        setDuration((currentDur) => {
+          processAndSaveRecording(selectedMime, currentDur);
+          return currentDur;
+        });
       };
 
       recorder.start(1000); // 1-second chunks for stream stability
@@ -177,7 +263,7 @@ export const Studio: React.FC<StudioProps> = ({
       setRecordingState('recording');
       setDuration(0);
 
-      // Throttled 1Hz timer to prevent CPU lag
+      if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setDuration((prev) => prev + 1);
       }, 1000);
@@ -189,93 +275,51 @@ export const Studio: React.FC<StudioProps> = ({
     } catch (err) {
       console.error('Error starting recording:', err);
     }
-  };
+  }, [selectedSource, micEnabled, settings, processAndSaveRecording]);
 
-  const handlePauseRecording = () => {
+  const handlePauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.pause();
       setRecordingState('paused');
       if (timerRef.current) clearInterval(timerRef.current);
     }
-  };
+  }, []);
 
-  const handleResumeRecording = () => {
+  const handleResumeRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
       mediaRecorderRef.current.resume();
       setRecordingState('recording');
+      if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setDuration((prev) => prev + 1);
       }, 1000);
     }
-  };
+  }, []);
 
-  const handleStopRecording = () => {
+  const handleStopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
     setRecordingState('idle');
-  };
+  }, []);
 
-  // Convert chunks, generate thumbnail, save file and write to SQLite
-  const processAndSaveRecording = async (mimeType: string) => {
-    const blob = new Blob(recordedChunksRef.current, { type: mimeType });
-    if (blob.size === 0) return;
-
-    const buffer = new Uint8Array(await blob.arrayBuffer());
-    const timestamp = new Date();
-    const formattedDate = timestamp
-      .toISOString()
-      .replace(/T/, '_')
-      .replace(/:/g, '-')
-      .split('.')[0];
-    const fileName = `Screenrz_${formattedDate}.webm`;
-
-    // Save directly to user's disk directory via Electron
-    const saveResult = await window.electronAPI.saveRecordingFile(fileName, buffer);
-
-    if (saveResult && saveResult.success) {
-      // Capture thumbnail from video
-      let thumbnailUrl: string | undefined = undefined;
-      if (videoPreviewRef.current) {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 320;
-          canvas.height = 180;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(videoPreviewRef.current, 0, 0, 320, 180);
-            thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
-          }
-        } catch {}
-      }
-
-      // Record in local SQLite database
-      const item: RecordingItem = {
-        id: `rec_${Date.now()}`,
-        title: `Recording ${formattedDate}`,
-        fileName,
-        filePath: saveResult.filePath,
-        fileSize: saveResult.size,
-        durationSeconds: duration,
-        width: 1920,
-        height: 1080,
-        fps: settings?.fps || 60,
-        mimeType,
-        hasAudio: sysAudioEnabled,
-        hasMic: micEnabled,
-        thumbnailUrl,
-        createdAt: timestamp.toISOString(),
+  // Expose controls to parent component for global control pill
+  useEffect(() => {
+    if (controlsRef) {
+      controlsRef.current = {
+        pause: handlePauseRecording,
+        resume: handleResumeRecording,
+        stop: handleStopRecording,
+        start: handleStartRecording,
       };
-
-      await window.electronAPI.saveRecordingRecord(item);
-      setLastSaved(saveResult.filePath);
-      onRecordingSaved();
-
-      // Clear notification after 4 seconds
-      setTimeout(() => setLastSaved(null), 4000);
     }
-  };
+  }, [controlsRef, handlePauseRecording, handleResumeRecording, handleStopRecording, handleStartRecording]);
+
+  // Sync state changes to parent (for TitleBar and Global Status Pill)
+  useEffect(() => {
+    onRecordingStateChange?.(recordingState, duration);
+  }, [recordingState, duration, onRecordingStateChange]);
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-6 space-y-6">

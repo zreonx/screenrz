@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TitleBar } from '@/components/layout/TitleBar';
 import { Sidebar, NavTab } from '@/components/layout/Sidebar';
-import { Studio } from '@/components/recording/Studio';
+import { Studio, StudioControls } from '@/components/recording/Studio';
 import { LibraryView } from '@/components/library/LibraryView';
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { VideoPlayerModal } from '@/components/player/VideoPlayerModal';
 import { AppSettings, RecordingItem } from '@/types/electron';
+import { formatDuration } from '@/lib/utils';
+import { Pause, Play, Square, Video } from 'lucide-react';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('studio');
@@ -13,6 +15,11 @@ export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [recordings, setRecordings] = useState<RecordingItem[]>([]);
   const [playingRecording, setPlayingRecording] = useState<RecordingItem | null>(null);
+
+  // Global recording status
+  const [recordingState, setRecordingState] = useState<'idle' | 'recording' | 'paused'>('idle');
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const studioControlsRef = useRef<StudioControls | null>(null);
 
   // Load SQLite settings and recordings on launch
   const loadData = useCallback(async () => {
@@ -64,13 +71,21 @@ export function App() {
     }
   };
 
+  const handleRecordingStateChange = useCallback(
+    (state: 'idle' | 'recording' | 'paused', duration: number) => {
+      setRecordingState(state);
+      setRecordingDuration(duration);
+    },
+    []
+  );
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#09090b] text-[#fafafa] font-sans antialiased">
       {/* Frameless Windows Titlebar */}
-      <TitleBar />
+      <TitleBar isRecording={recordingState !== 'idle'} />
 
       {/* Main App Container */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Collapsible shadcn-admin Sidebar */}
         <Sidebar
           currentTab={currentTab}
@@ -79,32 +94,92 @@ export function App() {
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           settings={settings}
           recordingCount={recordings.length}
+          isRecording={recordingState !== 'idle'}
         />
 
         {/* Dynamic Main Workspace View */}
-        <main className="flex-1 overflow-hidden bg-[#0c0c0e]">
-          {currentTab === 'studio' && (
+        <main className="flex-1 overflow-hidden bg-[#0c0c0e] relative">
+          {/* Floating Recording Mini-Control Pill when viewing Library or Settings while recording */}
+          {recordingState !== 'idle' && currentTab !== 'studio' && (
+            <div className="absolute top-4 right-6 z-40 flex items-center gap-3 px-4 py-2 rounded-full bg-zinc-900/90 backdrop-blur-md border border-rose-500/40 shadow-2xl animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                <span className="text-xs font-mono font-bold text-zinc-100">
+                  {formatDuration(recordingDuration)}
+                </span>
+                <span className="text-[10px] uppercase font-semibold text-rose-400">
+                  {recordingState}
+                </span>
+              </div>
+
+              <div className="h-3.5 w-px bg-zinc-700" />
+
+              <div className="flex items-center gap-1.5">
+                {recordingState === 'recording' ? (
+                  <button
+                    onClick={() => studioControlsRef.current?.pause()}
+                    className="p-1 rounded-md hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                    title="Pause"
+                  >
+                    <Pause className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => studioControlsRef.current?.resume()}
+                    className="p-1 rounded-md hover:bg-zinc-800 text-indigo-400 hover:text-indigo-300 transition-colors"
+                    title="Resume"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                <button
+                  onClick={() => studioControlsRef.current?.stop()}
+                  className="p-1 rounded-md hover:bg-rose-950 text-rose-400 hover:text-rose-200 transition-colors"
+                  title="Finish & Save"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                </button>
+
+                <button
+                  onClick={() => setCurrentTab('studio')}
+                  className="flex items-center gap-1 ml-1.5 px-2 py-0.5 rounded-full bg-indigo-600/20 hover:bg-indigo-600/30 text-[11px] font-medium text-indigo-400 border border-indigo-500/30 transition-colors"
+                >
+                  <Video className="w-3 h-3" />
+                  Studio
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Studio View - Stays mounted at all times to prevent recording interruption */}
+          <div className={`h-full w-full ${currentTab === 'studio' ? 'block' : 'hidden'}`}>
             <Studio
               settings={settings}
               onRecordingSaved={loadData}
               onOpenSettings={() => setCurrentTab('settings')}
+              onRecordingStateChange={handleRecordingStateChange}
+              controlsRef={studioControlsRef}
+              isActive={currentTab === 'studio'}
             />
-          )}
+          </div>
 
-          {currentTab === 'library' && (
+          {/* Library View - Stays mounted to retain scroll and search state */}
+          <div className={`h-full w-full ${currentTab === 'library' ? 'block' : 'hidden'}`}>
             <LibraryView
               recordings={recordings}
               onPlayRecording={(rec) => setPlayingRecording(rec)}
               onDeleteRecording={handleDeleteRecording}
             />
-          )}
+          </div>
 
-          {currentTab === 'settings' && (
+          {/* Settings View - Stays mounted */}
+          <div className={`h-full w-full ${currentTab === 'settings' ? 'block' : 'hidden'}`}>
             <SettingsModal
               settings={settings}
               onUpdateSettings={handleUpdateSettings}
             />
-          )}
+          </div>
         </main>
       </div>
 
