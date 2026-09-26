@@ -20,6 +20,8 @@ export function App() {
   const [recordingState, setRecordingState] = useState<'idle' | 'recording' | 'paused'>('idle');
   const [recordingDuration, setRecordingDuration] = useState(0);
   const studioControlsRef = useRef<StudioControls | null>(null);
+  const recordingStateRef = useRef<'idle' | 'recording' | 'paused'>('idle');
+  recordingStateRef.current = recordingState;
 
   // Load SQLite settings and recordings on launch
   const loadData = useCallback(async () => {
@@ -41,8 +43,13 @@ export function App() {
         videoQuality: 'high',
         includeMic: false,
         includeAudio: true,
+        includeCamera: false,
+        cameraPosition: 'bottom-right',
+        cameraShape: 'circle',
+        cameraDeviceId: '',
         theme: 'dark',
         autoMinimizeOnRecord: false,
+        minimizeToTray: true,
       });
     }
   }, []);
@@ -56,25 +63,19 @@ export function App() {
     if (!window.electronAPI?.onHotkeyToggleRecord) return;
 
     const unbindRecord = window.electronAPI.onHotkeyToggleRecord(() => {
-      setRecordingState((currentState) => {
-        if (currentState === 'idle') {
-          studioControlsRef.current?.start();
-        } else {
-          studioControlsRef.current?.stop();
-        }
-        return currentState;
-      });
+      if (recordingStateRef.current === 'idle') {
+        studioControlsRef.current?.start();
+      } else {
+        studioControlsRef.current?.stop();
+      }
     });
 
     const unbindPause = window.electronAPI.onHotkeyTogglePause(() => {
-      setRecordingState((currentState) => {
-        if (currentState === 'recording') {
-          studioControlsRef.current?.pause();
-        } else if (currentState === 'paused') {
-          studioControlsRef.current?.resume();
-        }
-        return currentState;
-      });
+      if (recordingStateRef.current === 'recording') {
+        studioControlsRef.current?.pause();
+      } else if (recordingStateRef.current === 'paused') {
+        studioControlsRef.current?.resume();
+      }
     });
 
     return () => {
@@ -187,8 +188,14 @@ export function App() {
             </div>
           )}
 
-          {/* Studio View - Stays mounted at all times to prevent recording interruption */}
-          <div className={`h-full w-full ${currentTab === 'studio' ? 'block' : 'hidden'}`}>
+          {/* Studio View - Stays mounted and alive at all times to prevent recording interruption */}
+          <div
+            className={`h-full w-full ${
+              currentTab === 'studio'
+                ? 'block'
+                : 'invisible absolute inset-0 pointer-events-none -z-50'
+            }`}
+          >
             <Studio
               settings={settings}
               onRecordingSaved={loadData}

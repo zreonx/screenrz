@@ -75,7 +75,14 @@ export const Studio: React.FC<StudioProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
-  const canvasAnimRef = useRef<number | null>(null);
+  const canvasAnimRef = useRef<any>(null);
+  const isProcessingRef = useRef<boolean>(false);
+  const durationRef = useRef<number>(0);
+
+  // Keep durationRef synchronized
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
 
   // Sync initial settings
   useEffect(() => {
@@ -113,7 +120,11 @@ export const Studio: React.FC<StudioProps> = ({
       stopPreviewStream();
       stopCameraStream();
       if (timerRef.current) clearInterval(timerRef.current);
-      if (canvasAnimRef.current) cancelAnimationFrame(canvasAnimRef.current);
+      if (canvasAnimRef.current) {
+        clearInterval(canvasAnimRef.current);
+        cancelAnimationFrame(canvasAnimRef.current);
+        canvasAnimRef.current = null;
+      }
     };
   }, []);
 
@@ -175,8 +186,17 @@ export const Studio: React.FC<StudioProps> = ({
       try {
         const constraints: MediaStreamConstraints = {
           video: deviceId
-            ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-            : { width: { ideal: 1280 }, height: { ideal: 720 } },
+            ? {
+                deviceId: { exact: deviceId },
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                frameRate: { ideal: 60, min: 30 },
+              }
+            : {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                frameRate: { ideal: 60, min: 30 },
+              },
         };
         stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (exactErr) {
@@ -277,62 +297,83 @@ export const Studio: React.FC<StudioProps> = ({
   // Convert chunks, generate thumbnail, save file and write to SQLite
   const processAndSaveRecording = useCallback(
     async (mimeType: string, finalDuration: number) => {
-      const blob = new Blob(recordedChunksRef.current, { type: mimeType });
-      if (blob.size === 0) return;
+      // Re-entrancy guard to prevent multiple files being written from double events
+      if (isProcessingRef.current) return;
+      isProcessingRef.current = true;
 
-      const buffer = new Uint8Array(await blob.arrayBuffer());
-      const timestamp = new Date();
-      const formattedDate = timestamp
-        .toISOString()
-        .replace(/T/, '_')
-        .replace(/:/g, '-')
-        .split('.')[0];
-      const fileName = `Screenrz_${formattedDate}.webm`;
+      const chunks = [...recordedChunksRef.current];
+      recordedChunksRef.current = [];
 
-      // Save directly to user's disk directory via Electron
-      const saveResult = await window.electronAPI.saveRecordingFile(fileName, buffer);
+      if (chunks.length === 0) {
+        isProcessingRef.current = false;
+        return;
+      }
 
-      if (saveResult && saveResult.success) {
-        // Capture thumbnail from video
-        let thumbnailUrl: string | undefined = undefined;
-        if (videoPreviewRef.current) {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 320;
-            canvas.height = 180;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(videoPreviewRef.current, 0, 0, 320, 180);
-              thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
-            }
-          } catch {}
+      const blob = new Blob(chunks, { type: mimeType });
+      if (blob.size === 0) {
+        isProcessingRef.current = false;
+        return;
+      }
+
+      try {
+        const buffer = new Uint8Array(await blob.arrayBuffer());
+        const timestamp = new Date();
+        const formattedDate = timestamp
+          .toISOString()
+          .replace(/T/, '_')
+          .replace(/:/g, '-')
+          .split('.')[0];
+        const fileName = `Screenrz_${formattedDate}.webm`;
+
+        // Save directly to user's disk directory via Electron
+        const saveResult = await window.electronAPI.saveRecordingFile(fileName, buffer);
+
+        if (saveResult && saveResult.success) {
+          // Capture thumbnail from video
+          let thumbnailUrl: string | undefined = undefined;
+          if (videoPreviewRef.current) {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = 320;
+              canvas.height = 180;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(videoPreviewRef.current, 0, 0, 320, 180);
+                thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
+              }
+            } catch {}
+          }
+
+          // Record in local SQLite database
+          const item: RecordingItem = {
+            id: `rec_${Date.now()}`,
+            title: `Recording ${formattedDate}`,
+            fileName,
+            filePath: saveResult.filePath,
+            fileSize: saveResult.size,
+            durationSeconds: finalDuration,
+            width: 1920,
+            height: 1080,
+            fps: settings?.fps || 60,
+            mimeType,
+            hasAudio: sysAudioEnabled,
+            hasMic: micEnabled,
+            hasCamera: cameraEnabled,
+            thumbnailUrl,
+            createdAt: timestamp.toISOString(),
+          };
+
+          await window.electronAPI.saveRecordingRecord(item);
+          setLastSaved(saveResult.filePath);
+          onRecordingSaved();
+
+          // Clear notification after 4 seconds
+          setTimeout(() => setLastSaved(null), 4000);
         }
-
-        // Record in local SQLite database
-        const item: RecordingItem = {
-          id: `rec_${Date.now()}`,
-          title: `Recording ${formattedDate}`,
-          fileName,
-          filePath: saveResult.filePath,
-          fileSize: saveResult.size,
-          durationSeconds: finalDuration,
-          width: 1920,
-          height: 1080,
-          fps: settings?.fps || 60,
-          mimeType,
-          hasAudio: sysAudioEnabled,
-          hasMic: micEnabled,
-          hasCamera: cameraEnabled,
-          thumbnailUrl,
-          createdAt: timestamp.toISOString(),
-        };
-
-        await window.electronAPI.saveRecordingRecord(item);
-        setLastSaved(saveResult.filePath);
-        onRecordingSaved();
-
-        // Clear notification after 4 seconds
-        setTimeout(() => setLastSaved(null), 4000);
+      } catch (err) {
+        console.error('Error saving recording file:', err);
+      } finally {
+        isProcessingRef.current = false;
       }
     },
     [settings?.fps, sysAudioEnabled, micEnabled, cameraEnabled, onRecordingSaved]
@@ -340,6 +381,9 @@ export const Studio: React.FC<StudioProps> = ({
 
   // Start actual recording
   const handleStartRecording = useCallback(async () => {
+    isProcessingRef.current = false;
+    durationRef.current = 0;
+
     let activeStream = mediaStreamRef.current;
 
     // Auto-discover primary display if not ready
@@ -386,94 +430,117 @@ export const Studio: React.FC<StudioProps> = ({
         videoPreviewRef.current &&
         cameraStreamRef.current
       ) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1920;
-        canvas.height = 1080;
-        const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-
         const screenVid = videoPreviewRef.current;
         const camVid = cameraVideoRef.current;
 
+        const screenWidth = screenVid.videoWidth || 1920;
+        const screenHeight = screenVid.videoHeight || 1080;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = screenWidth;
+        canvas.height = screenHeight;
+        const ctx = canvas.getContext('2d', {
+          alpha: false,
+          desynchronized: true,
+          willReadFrequently: false,
+        });
+
+        // Dedicated offscreen canvas for camera overlay to eliminate expensive 1080p stencil clip ops
+        const diameter = Math.round(screenWidth * (320 / 1920));
+        const radius = diameter / 2;
+        const camCanvas = document.createElement('canvas');
+        camCanvas.width = diameter;
+        camCanvas.height = diameter;
+        const camCtx = camCanvas.getContext('2d', { alpha: true });
+
+        const pad = Math.round(screenWidth * (40 / 1920));
+        const targetFps = settings?.fps || 60;
+
         const drawLoop = () => {
           if (!ctx) return;
-          // 1. Draw base screen
-          ctx.drawImage(screenVid, 0, 0, 1920, 1080);
+          // 1. Draw base screen (hardware accelerated copy)
+          try {
+            ctx.drawImage(screenVid, 0, 0, screenWidth, screenHeight);
+          } catch {}
 
-          // 2. Draw camera overlay according to shape & position if video has frame data
+          // 2. Draw camera overlay according to shape & position
           if (camVid && camVid.readyState >= 2) {
-            const pad = 40;
-            if (cameraShape === 'circle') {
-              const diameter = 320;
-              const radius = diameter / 2;
-              let cx = 1920 - pad - radius;
-              let cy = 1080 - pad - radius;
+            try {
+              if (cameraShape === 'circle') {
+                if (camCtx) {
+                  camCtx.clearRect(0, 0, diameter, diameter);
+                  camCtx.save();
+                  camCtx.beginPath();
+                  camCtx.arc(radius, radius, radius, 0, Math.PI * 2);
+                  camCtx.clip();
+                  // Mirror image horizontally for natural webcam feel
+                  camCtx.translate(diameter, 0);
+                  camCtx.scale(-1, 1);
+                  camCtx.drawImage(camVid, 0, 0, diameter, diameter);
+                  camCtx.restore();
+                }
 
-              if (cameraPosition === 'bottom-left') {
-                cx = pad + radius;
-                cy = 1080 - pad - radius;
-              } else if (cameraPosition === 'top-right') {
-                cx = 1920 - pad - radius;
-                cy = pad + radius;
-              } else if (cameraPosition === 'top-left') {
-                cx = pad + radius;
-                cy = pad + radius;
+                let cx = screenWidth - pad - radius;
+                let cy = screenHeight - pad - radius;
+
+                if (cameraPosition === 'bottom-left') {
+                  cx = pad + radius;
+                  cy = screenHeight - pad - radius;
+                } else if (cameraPosition === 'top-right') {
+                  cx = screenWidth - pad - radius;
+                  cy = pad + radius;
+                } else if (cameraPosition === 'top-left') {
+                  cx = pad + radius;
+                  cy = pad + radius;
+                }
+
+                // Blit fast circular webcam onto screen canvas
+                ctx.drawImage(camCanvas, cx - radius, cy - radius);
+
+                // Accent border ring
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = '#6366f1';
+                ctx.stroke();
+              } else {
+                // Rectangle PiP
+                const rw = Math.round(screenWidth * (420 / 1920));
+                const rh = Math.round(screenHeight * (236 / 1080));
+                let rx = screenWidth - pad - rw;
+                let ry = screenHeight - pad - rh;
+
+                if (cameraPosition === 'bottom-left') {
+                  rx = pad;
+                  ry = screenHeight - pad - rh;
+                } else if (cameraPosition === 'top-right') {
+                  rx = screenWidth - pad - rw;
+                  ry = pad;
+                } else if (cameraPosition === 'top-left') {
+                  rx = pad;
+                  ry = pad;
+                }
+
+                ctx.save();
+                ctx.translate(rx + rw, ry);
+                ctx.scale(-1, 1);
+                ctx.drawImage(camVid, 0, 0, rw, rh);
+                ctx.restore();
+
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = '#6366f1';
+                ctx.strokeRect(rx, ry, rw, rh);
               }
-
-              ctx.save();
-              ctx.beginPath();
-              ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-              ctx.clip();
-              // Mirror image horizontally for natural webcam feel
-              ctx.translate(cx, cy);
-              ctx.scale(-1, 1);
-              ctx.drawImage(camVid, -radius, -radius, diameter, diameter);
-              ctx.restore();
-
-              // Accent border ring
-              ctx.save();
-              ctx.beginPath();
-              ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-              ctx.lineWidth = 6;
-              ctx.strokeStyle = '#6366f1';
-              ctx.stroke();
-              ctx.restore();
-            } else {
-              // Rectangle PiP
-              const w = 420;
-              const h = 236;
-              let rx = 1920 - pad - w;
-              let ry = 1080 - pad - h;
-
-              if (cameraPosition === 'bottom-left') {
-                rx = pad;
-                ry = 1080 - pad - h;
-              } else if (cameraPosition === 'top-right') {
-                rx = 1920 - pad - w;
-                ry = pad;
-              } else if (cameraPosition === 'top-left') {
-                rx = pad;
-                ry = pad;
-              }
-
-              ctx.save();
-              ctx.translate(rx + w / 2, ry + h / 2);
-              ctx.scale(-1, 1);
-              ctx.drawImage(camVid, -w / 2, -h / 2, w, h);
-              ctx.restore();
-
-              ctx.save();
-              ctx.lineWidth = 5;
-              ctx.strokeStyle = '#6366f1';
-              ctx.strokeRect(rx, ry, w, h);
-              ctx.restore();
-            }
+            } catch {}
           }
-
-          canvasAnimRef.current = requestAnimationFrame(drawLoop);
         };
 
-        drawLoop();
-        const canvasStream = canvas.captureStream(settings?.fps || 60);
+        // Run rock-solid interval that never drops frames even when minimized
+        const intervalMs = Math.max(12, Math.floor(1000 / targetFps));
+        const intervalId = setInterval(drawLoop, intervalMs);
+        canvasAnimRef.current = intervalId;
+
+        const canvasStream = canvas.captureStream(targetFps);
         combinedStream = new MediaStream([
           ...canvasStream.getVideoTracks(),
           ...combinedStream.getAudioTracks(),
@@ -482,8 +549,9 @@ export const Studio: React.FC<StudioProps> = ({
 
       recordedChunksRef.current = [];
 
-      // Determine optimal mimeType
+      // Determine optimal mimeType (prefer VP9 / VP8)
       const mimeTypes = [
+        'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
         'video/webm;codecs=vp8',
         'video/webm',
@@ -514,13 +582,12 @@ export const Studio: React.FC<StudioProps> = ({
 
       recorder.onstop = async () => {
         if (canvasAnimRef.current) {
+          clearInterval(canvasAnimRef.current);
           cancelAnimationFrame(canvasAnimRef.current);
           canvasAnimRef.current = null;
         }
-        setDuration((currentDur) => {
-          processAndSaveRecording(selectedMime, currentDur);
-          return currentDur;
-        });
+        const finalDur = durationRef.current;
+        await processAndSaveRecording(selectedMime, finalDur);
       };
 
       recorder.start(1000); // 1-second chunks for stream stability
@@ -571,8 +638,12 @@ export const Studio: React.FC<StudioProps> = ({
   }, []);
 
   const handleStopRecording = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     if (canvasAnimRef.current) {
+      clearInterval(canvasAnimRef.current);
       cancelAnimationFrame(canvasAnimRef.current);
       canvasAnimRef.current = null;
     }

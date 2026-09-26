@@ -34,6 +34,8 @@ app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEnc
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 let mainWindow: BrowserWindow | null = null;
 let db: LocalDatabase;
@@ -144,6 +146,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: false,
       webSecurity: false, // Allows playing local video files directly
+      backgroundThrottling: false, // Prevents background or minimized capture throttling
     },
     show: false,
   });
