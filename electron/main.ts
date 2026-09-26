@@ -54,6 +54,20 @@ const recTrayIcon = nativeImage.createFromDataURL('data:image/png;base64,' + rec
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+// Ensure only a single instance of Screenrz is running
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 function updateTrayMenu() {
   const settings = db.getSettings();
   const contextMenu = Menu.buildFromTemplate([
@@ -165,7 +179,7 @@ function createWindow() {
   });
 
   if (isDev) {
-    const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5174';
+    const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5174';
     mainWindow.loadURL(devServerUrl);
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));

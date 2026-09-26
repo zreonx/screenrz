@@ -8,10 +8,11 @@ export default defineConfig({
   base: './',
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   server: {
+    host: '127.0.0.1',
     port: 5174,
     strictPort: true,
   },
