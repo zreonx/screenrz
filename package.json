@@ -21,7 +21,7 @@
     "react",
     "tailwind"
   ],
-  "author": "",
+  "author": "zreonx",
   "license": "MIT",
   "dependencies": {
     "clsx": "^2.1.1",

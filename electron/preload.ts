@@ -55,6 +55,7 @@ const electronAPI = {
   selectDirectory: () => ipcRenderer.invoke('dialog:select-directory'),
   openInExplorer: (filePath: string) => ipcRenderer.invoke('shell:open-in-explorer', filePath),
   openPath: (filePath: string) => ipcRenderer.invoke('shell:open-path', filePath),
+  openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
 
   // Screen Capturer Sources
   getSources: () => ipcRenderer.invoke('capturer:get-sources'),

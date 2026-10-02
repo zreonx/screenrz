@@ -668,24 +668,24 @@ export const Studio: React.FC<StudioProps> = ({
   }, [recordingState, duration, onRecordingStateChange]);
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-6 space-y-6">
+    <div className="flex flex-col h-full overflow-y-auto p-3 sm:p-5 gap-3 sm:gap-4 settings-scroll">
       {/* Top Banner & Title */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
             Screenrz Studio
             <span className="text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700/60">
               Hardware Direct
             </span>
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Zero-latency screen & webcam capture saving straight to local disk and SQLite.
+          <p className="text-xs text-zinc-400 mt-0.5 hidden sm:block">
+            Zero-latency screen &amp; webcam capture saving straight to local disk and SQLite.
           </p>
         </div>
 
         {/* Hotkey hint + Destination Path */}
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 font-mono">
+          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 font-mono">
             <span className="text-zinc-500">Record:</span>
             <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-semibold border border-zinc-700 text-[10px]">
               F12
@@ -694,18 +694,18 @@ export const Studio: React.FC<StudioProps> = ({
 
           <button
             onClick={onOpenSettings}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="max-w-[180px] truncate">
+            <FolderOpen className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+            <span className="max-w-[120px] sm:max-w-[180px] truncate">
               {settings?.outputDirectory ? settings.outputDirectory.split('\\').pop() : 'Output folder'}
             </span>
           </button>
         </div>
       </div>
 
-      {/* Main Studio Viewport */}
-      <div className="relative aspect-video w-full rounded-2xl bg-[#09090b] border border-zinc-800/90 overflow-hidden shadow-2xl flex items-center justify-center group select-none">
+      {/* Main Studio Viewport - Flexibly fits available height so controls are never pushed off */}
+      <div className="relative flex-1 min-h-[160px] w-full rounded-xl sm:rounded-2xl bg-[#09090b] border border-zinc-800/90 overflow-hidden shadow-2xl flex items-center justify-center group select-none">
         {/* Base Screen Video */}
         <video
           ref={videoPreviewRef}
@@ -722,16 +722,16 @@ export const Studio: React.FC<StudioProps> = ({
             title="Click to cycle webcam position (Bottom-Right, Bottom-Left, Top-Left, Top-Right)"
             className={`absolute z-20 cursor-pointer shadow-2xl transition-all duration-300 border-2 border-indigo-500 bg-zinc-950 overflow-hidden group/cam ${
               cameraPosition === 'bottom-right'
-                ? 'bottom-5 right-5'
+                ? 'bottom-2 right-2 sm:bottom-4 sm:right-4'
                 : cameraPosition === 'bottom-left'
-                ? 'bottom-5 left-5'
+                ? 'bottom-2 left-2 sm:bottom-4 sm:left-4'
                 : cameraPosition === 'top-right'
-                ? 'top-5 right-5'
-                : 'top-5 left-5'
+                ? 'top-2 right-2 sm:top-4 sm:right-4'
+                : 'top-2 left-2 sm:top-4 sm:left-4'
             } ${
               cameraShape === 'circle'
-                ? 'w-32 h-32 rounded-full'
-                : 'w-48 h-28 rounded-xl'
+                ? 'w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full'
+                : 'w-32 h-20 sm:w-40 sm:h-24 md:w-48 md:h-28 rounded-lg sm:rounded-xl'
             }`}
           >
             <video
@@ -814,44 +814,47 @@ export const Studio: React.FC<StudioProps> = ({
         )}
       </div>
 
-      {/* Control Strip & Audio/Camera Toggles */}
-      <div className="relative flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80">
-        {/* Left: Audio & Device Controls */}
-        <div className="flex items-center gap-2">
+      {/* Control Strip — responsive: flex-shrink-0 so it NEVER gets cut off or hidden */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80 flex-shrink-0">
+
+        {/* Left: Audio & Device Toggles */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {/* System Audio Toggle */}
           <button
             onClick={() => setSysAudioEnabled(!sysAudioEnabled)}
             disabled={recordingState !== 'idle'}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors border ${
+            title={sysAudioEnabled ? 'Disable System Audio' : 'Enable System Audio'}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors border ${
               sysAudioEnabled
                 ? 'bg-zinc-800/80 text-zinc-200 border-zinc-700'
                 : 'bg-zinc-950/60 text-zinc-500 border-zinc-800 hover:text-zinc-300'
             }`}
           >
             {sysAudioEnabled ? (
-              <Volume2 className="w-4 h-4 text-emerald-400" />
+              <Volume2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
             ) : (
-              <VolumeX className="w-4 h-4" />
+              <VolumeX className="w-4 h-4 flex-shrink-0" />
             )}
-            <span>System Audio</span>
+            <span className="hidden sm:inline whitespace-nowrap">System Audio</span>
           </button>
 
           {/* Microphone Toggle */}
           <button
             onClick={() => setMicEnabled(!micEnabled)}
             disabled={recordingState !== 'idle'}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors border ${
+            title={micEnabled ? 'Disable Microphone' : 'Enable Microphone'}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors border ${
               micEnabled
                 ? 'bg-zinc-800/80 text-zinc-200 border-zinc-700'
                 : 'bg-zinc-950/60 text-zinc-500 border-zinc-800 hover:text-zinc-300'
             }`}
           >
             {micEnabled ? (
-              <Mic className="w-4 h-4 text-emerald-400" />
+              <Mic className="w-4 h-4 text-emerald-400 flex-shrink-0" />
             ) : (
-              <MicOff className="w-4 h-4" />
+              <MicOff className="w-4 h-4 flex-shrink-0" />
             )}
-            <span>Microphone</span>
+            <span className="hidden sm:inline whitespace-nowrap">Microphone</span>
           </button>
 
           {/* Camera Overlay Toggle & Config */}
@@ -859,18 +862,19 @@ export const Studio: React.FC<StudioProps> = ({
             <button
               onClick={toggleCamera}
               disabled={recordingState !== 'idle'}
-              className={`flex items-center gap-2 px-3 py-2 rounded-l-lg text-xs font-medium transition-colors border border-r-0 ${
+              title={cameraEnabled ? 'Disable Webcam PiP' : 'Enable Webcam PiP'}
+              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-l-lg text-xs font-medium transition-colors border border-r-0 ${
                 cameraEnabled
                   ? 'bg-indigo-950/60 text-indigo-300 border-indigo-700/80'
                   : 'bg-zinc-950/60 text-zinc-500 border-zinc-800 hover:text-zinc-300'
               }`}
             >
               {cameraEnabled ? (
-                <Camera className="w-4 h-4 text-indigo-400" />
+                <Camera className="w-4 h-4 text-indigo-400 flex-shrink-0" />
               ) : (
-                <CameraOff className="w-4 h-4" />
+                <CameraOff className="w-4 h-4 flex-shrink-0" />
               )}
-              <span>Webcam PiP</span>
+              <span className="hidden sm:inline whitespace-nowrap">Webcam PiP</span>
             </button>
 
             <button
@@ -982,54 +986,54 @@ export const Studio: React.FC<StudioProps> = ({
           </div>
         </div>
 
-        {/* Center: Primary Record Controls */}
-        <div className="flex items-center gap-3">
+        {/* Center: Primary Record Controls — always visible and responsive */}
+        <div className="flex items-center gap-1.5 sm:gap-2 mx-auto sm:mx-0 flex-shrink-0">
           {recordingState === 'idle' ? (
             <button
               onClick={handleStartRecording}
-              className="flex items-center gap-2.5 px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/25 transition-all hover:scale-[1.03] active:scale-[0.98]"
+              className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/25 transition-all hover:scale-[1.03] active:scale-[0.98] whitespace-nowrap"
             >
-              <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-              Start Recording
-              <span className="ml-1 text-[10px] opacity-75 font-mono">(F12)</span>
+              <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-white animate-pulse flex-shrink-0" />
+              <span>Start Recording</span>
+              <span className="hidden sm:inline text-[10px] opacity-75 font-mono">(F12)</span>
             </button>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {recordingState === 'recording' ? (
                 <button
                   onClick={handlePauseRecording}
                   title="Pause recording (Shift+F12)"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition-colors whitespace-nowrap"
                 >
-                  <Pause className="w-3.5 h-3.5" />
-                  Pause
+                  <Pause className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="hidden sm:inline">Pause</span>
                 </button>
               ) : (
                 <button
                   onClick={handleResumeRecording}
                   title="Resume recording (Shift+F12)"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shadow-md transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shadow-md transition-colors whitespace-nowrap"
                 >
-                  <Play className="w-3.5 h-3.5" />
-                  Resume
+                  <Play className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="hidden sm:inline">Resume</span>
                 </button>
               )}
 
               <button
                 onClick={handleStopRecording}
                 title="Stop recording (F12)"
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-semibold shadow-md transition-colors"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-semibold shadow-md transition-colors whitespace-nowrap"
               >
-                <Square className="w-3.5 h-3.5 fill-current" />
-                Finish & Save
+                <Square className="w-3.5 h-3.5 fill-current flex-shrink-0" />
+                <span>Finish &amp; Save</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* Right: Quick Spec Info */}
-        <div className="flex items-center gap-3 text-xs text-zinc-400">
-          <span className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-400">
+        {/* Right: Spec badge — hidden on small widths */}
+        <div className="hidden md:flex items-center flex-shrink-0">
+          <span className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-400 whitespace-nowrap">
             <Sparkles className="w-3 h-3 text-indigo-400" />
             {cameraEnabled ? 'Composited PiP' : 'Hardware Direct'}
           </span>

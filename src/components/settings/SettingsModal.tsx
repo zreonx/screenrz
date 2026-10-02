@@ -9,6 +9,9 @@ import {
   Keyboard,
   Sparkles,
   Camera,
+  Info,
+  ExternalLink,
+  Heart,
 } from 'lucide-react';
 import { AppSettings } from '@/types/electron';
 
@@ -38,6 +41,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleOpenCurrentFolder = () => {
     if (settings?.outputDirectory) {
       window.electronAPI?.openInExplorer(settings.outputDirectory);
+    }
+  };
+
+  const handleOpenGithub = () => {
+    const url = 'https://github.com/zreonx';
+    if (window.electronAPI?.openExternal) {
+      window.electronAPI.openExternal(url);
+    } else {
+      window.open(url, '_blank');
     }
   };
 
@@ -295,6 +307,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex items-center gap-2 pt-1 text-[11px] text-emerald-400 font-medium">
           <Check className="w-3.5 h-3.5" />
           SQLite Database: Active & Synchronized
+        </div>
+      </div>
+
+      {/* SECTION 6: About & Developer Information */}
+      <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+            <Info className="w-4 h-4 text-indigo-400" />
+            <h3>About Screenrz</h3>
+          </div>
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+            v1.0.0
+          </span>
+        </div>
+
+        <p className="text-xs text-zinc-400 leading-relaxed">
+          High-performance screen &amp; webcam recorder built for Windows with Bandicam-speed performance, GPU shader compositing, local SQLite storage, and complete offline privacy.
+        </p>
+
+        {/* Developer Card */}
+        <div className="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700/70 flex items-center justify-center text-zinc-200 flex-shrink-0 shadow-inner">
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+              </svg>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-zinc-100">zreonx</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">
+                  Developer
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400 font-mono mt-0.5">github.com/zreonx</p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleOpenGithub}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 hover:text-white text-xs font-medium transition-colors border border-zinc-700 shadow-sm"
+          >
+            <span>GitHub Profile</span>
+            <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
+          </button>
+        </div>
+
+        {/* Tech Stack Specs */}
+        <div className="pt-2 border-t border-zinc-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+          <div className="p-2 rounded-lg bg-zinc-950/50 border border-zinc-800/60">
+            <span className="text-[10px] text-zinc-500 block uppercase">Runtime</span>
+            <span className="text-xs text-zinc-300 font-medium">Electron 44</span>
+          </div>
+          <div className="p-2 rounded-lg bg-zinc-950/50 border border-zinc-800/60">
+            <span className="text-[10px] text-zinc-500 block uppercase">Frontend</span>
+            <span className="text-xs text-zinc-300 font-medium">React 19</span>
+          </div>
+          <div className="p-2 rounded-lg bg-zinc-950/50 border border-zinc-800/60">
+            <span className="text-[10px] text-zinc-500 block uppercase">Compositor</span>
+            <span className="text-xs text-zinc-300 font-medium">WebGL GLSL</span>
+          </div>
+          <div className="p-2 rounded-lg bg-zinc-950/50 border border-zinc-800/60">
+            <span className="text-[10px] text-zinc-500 block uppercase">Database</span>
+            <span className="text-xs text-zinc-300 font-medium">node:sqlite</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-1.5 pt-1 text-[11px] text-zinc-500">
+          <span>Crafted with</span>
+          <Heart className="w-3 h-3 text-rose-500 fill-rose-500/40 inline" />
+          <span>by</span>
+          <button
+            onClick={handleOpenGithub}
+            className="text-zinc-400 hover:text-indigo-400 font-medium transition-colors underline underline-offset-2"
+          >
+            zreonx
+          </button>
         </div>
       </div>
       </div>

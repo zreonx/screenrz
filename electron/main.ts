@@ -178,6 +178,14 @@ function createWindow() {
     }
   });
 
+  // Open external links in default system browser (GitHub, docs, etc.)
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
   if (isDev) {
     const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5174';
     mainWindow.loadURL(devServerUrl);
@@ -271,6 +279,12 @@ ipcMain.handle('shell:open-in-explorer', async (_event, filePath: string) => {
 ipcMain.handle('shell:open-path', async (_event, filePath: string) => {
   if (fs.existsSync(filePath)) {
     await shell.openPath(filePath);
+  }
+});
+
+ipcMain.handle('shell:open-external', async (_event, url: string) => {
+  if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+    await shell.openExternal(url);
   }
 });
 

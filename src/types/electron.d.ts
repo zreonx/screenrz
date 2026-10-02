@@ -53,6 +53,7 @@ export interface ElectronAPI {
   selectDirectory: () => Promise<string | null>;
   openInExplorer: (filePath: string) => Promise<void>;
   openPath: (filePath: string) => Promise<void>;
+  openExternal: (url: string) => Promise<void>;
 
   // Native Screen Capturer
   getSources: () => Promise<DesktopCapturerSource[]>;
