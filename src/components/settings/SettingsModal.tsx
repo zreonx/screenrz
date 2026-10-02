@@ -42,7 +42,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-scroll p-6 max-w-3xl space-y-6 settings-scroll">
+    <div className="h-full w-full overflow-y-scroll overflow-x-hidden settings-scroll">
+      <div className="flex flex-col max-w-3xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
@@ -295,6 +296,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <Check className="w-3.5 h-3.5" />
           SQLite Database: Active & Synchronized
         </div>
+      </div>
       </div>
     </div>
   );
