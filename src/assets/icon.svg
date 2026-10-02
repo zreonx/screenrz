@@ -1,43 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="none">
-  <defs>
-    <!-- Soft ambient drop shadow -->
-    <filter id="screenrzShadow" x="-10%" y="-10%" width="120%" height="130%" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0a1432" flood-opacity="0.22" />
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0a1432" flood-opacity="0.14" />
-    </filter>
-
-    <!-- Vibrant Blue Linear Gradient -->
-    <linearGradient id="blueBadgeGrad" x1="50" y1="102" x2="462" y2="410" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#1E90FF" />
-      <stop offset="100%" stop-color="#0C66EB" />
-    </linearGradient>
-
-    <!-- Top edge glass highlight -->
-    <linearGradient id="topRim" x1="256" y1="102" x2="256" y2="410" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.45" />
-      <stop offset="15%" stop-color="#FFFFFF" stop-opacity="0.15" />
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
-    </linearGradient>
-
-    <!-- White Circle Gradient -->
-    <linearGradient id="whiteCircleGrad" x1="256" y1="208" x2="256" y2="304" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF" />
-      <stop offset="100%" stop-color="#F2F6FF" />
-    </linearGradient>
-  </defs>
-
-  <!-- Blue Rounded Screen Badge with Shadow -->
-  <rect x="50" y="102" width="412" height="308" rx="76" fill="url(#blueBadgeGrad)" filter="url(#screenrzShadow)" />
-
-  <!-- Top Glass Highlight Rim -->
-  <rect x="50" y="102" width="412" height="308" rx="76" stroke="url(#topRim)" stroke-width="2" fill="none" />
-
-  <!-- Subtle Outer Contrast Contour -->
-  <rect x="50" y="102" width="412" height="308" rx="76" stroke="#001E64" stroke-opacity="0.12" stroke-width="1.5" fill="none" />
-
-  <!-- Aperture Depth Ring -->
-  <circle cx="256" cy="256" r="54" fill="#00236E" fill-opacity="0.14" />
-
-  <!-- Centered White Recording Circle -->
-  <circle cx="256" cy="256" r="48" fill="url(#whiteCircleGrad)" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="1.5" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Pure vibrant blue squircle occupying space (no borders, no black) -->
+  <rect x="6" y="6" width="500" height="500" rx="112" fill="#1877F2" />
+  <!-- Crisp white circle in the center -->
+  <circle cx="256" cy="256" r="86" fill="#FFFFFF" />
 </svg>

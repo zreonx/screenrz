@@ -39,7 +39,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ isRecording = false, onOpenA
           title="About Screenrz Desktop"
           className="flex items-center gap-2 app-no-drag group cursor-pointer"
         >
-          <div className="w-5 h-5 rounded-md overflow-hidden flex items-center justify-center shadow-xs ring-1 ring-blue-500/30 group-hover:ring-blue-400/60 transition-all bg-zinc-950">
+          <div className="w-5 h-5 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0">
             <img src={appIcon} alt="Screenrz" className="w-full h-full object-cover" />
           </div>
           <span className="text-xs font-semibold tracking-wide text-zinc-200 group-hover:text-blue-300 transition-colors">

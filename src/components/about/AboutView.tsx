@@ -44,19 +44,13 @@ export const AboutView: React.FC<AboutViewProps> = ({ settings }) => {
           <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10 text-center sm:text-left">
-            {/* Blue Screenrz App Icon */}
-            <div className="relative group">
-              <div className="w-24 h-24 rounded-2xl p-1 bg-gradient-to-tr from-blue-600 to-cyan-400 shadow-lg shadow-blue-500/25 flex items-center justify-center">
-                <img
-                  src={appIcon}
-                  alt="Screenrz Desktop"
-                  className="w-full h-full rounded-[14px] object-cover bg-black"
-                />
-              </div>
-              <span className="absolute -bottom-2 -right-2 flex h-5 w-5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-5 w-5 bg-blue-500 border-2 border-[#09090b]" />
-              </span>
+            {/* Blue & White Screenrz App Icon */}
+            <div className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-xl shadow-blue-600/20">
+              <img
+                src={appIcon}
+                alt="Screenrz Desktop"
+                className="w-full h-full object-cover"
+              />
             </div>
 
             <div className="flex-1 space-y-2">
