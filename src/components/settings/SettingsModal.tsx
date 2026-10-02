@@ -20,6 +20,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateSettings,
 }) => {
   const [isChangingDir, setIsChangingDir] = useState(false);
+  const [customFps, setCustomFps] = useState<string>(String(settings?.fps || 60));
+
+  React.useEffect(() => {
+    if (settings?.fps) {
+      setCustomFps(String(settings.fps));
+    }
+  }, [settings?.fps]);
 
   const handleBrowseDirectory = async () => {
     setIsChangingDir(true);
@@ -125,25 +132,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Framerate Selection */}
-        <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
-          <div>
-            <div className="text-xs font-medium text-zinc-200">Frame Rate (FPS)</div>
-            <div className="text-[11px] text-zinc-500">60 FPS provides smooth motion, 30 FPS uses less disk space.</div>
+        <div className="py-3 border-b border-zinc-800/60 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="text-xs font-medium text-zinc-200 flex items-center gap-2">
+                <span>Frame Rate (FPS)</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-semibold">
+                  {settings?.fps || 60} FPS (~{(1000 / (settings?.fps || 60)).toFixed(1)} ms/frame)
+                </span>
+              </div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">
+                Choose a broadcast preset or specify a custom framerate (10 – 240 FPS).
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-950 border border-zinc-800 self-start sm:self-auto">
+              {[24, 30, 60, 120, 144].map((fpsVal) => (
+                <button
+                  key={fpsVal}
+                  type="button"
+                  onClick={() => {
+                    setCustomFps(String(fpsVal));
+                    onUpdateSettings({ fps: fpsVal });
+                  }}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    settings?.fps === fpsVal
+                      ? 'bg-zinc-800 text-zinc-100 shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  {fpsVal}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-zinc-950 border border-zinc-800">
-            {[30, 60].map((fpsVal) => (
-              <button
-                key={fpsVal}
-                onClick={() => onUpdateSettings({ fps: fpsVal })}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                  settings?.fps === fpsVal
-                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                {fpsVal} FPS
-              </button>
-            ))}
+
+          {/* Custom Slider & Direct Number Input */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 bg-zinc-950/70 p-3 rounded-lg border border-zinc-800/80">
+            <div className="flex-1 space-y-1.5">
+              <div className="flex justify-between text-[11px] text-zinc-400">
+                <span>Custom FPS Slider</span>
+                <span className="font-mono text-zinc-300 font-semibold">{settings?.fps || 60} FPS</span>
+              </div>
+              <input
+                type="range"
+                min={10}
+                max={240}
+                step={1}
+                value={settings?.fps || 60}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setCustomFps(String(val));
+                  onUpdateSettings({ fps: val });
+                }}
+                className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
+              />
+              <div className="flex justify-between text-[10px] text-zinc-600 font-mono">
+                <span>10</span>
+                <span>30</span>
+                <span>60</span>
+                <span>120</span>
+                <span>144</span>
+                <span>240</span>
+              </div>
+            </div>
+
+            <div className="hidden sm:block h-10 w-[1px] bg-zinc-800" />
+
+            <div className="flex sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-1 pt-1 sm:pt-0 border-t sm:border-t-0 border-zinc-800/60">
+              <label className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">
+                Custom FPS
+              </label>
+              <div className="flex items-center rounded-lg bg-zinc-900 border border-zinc-700/80 px-2.5 py-1 focus-within:border-indigo-500">
+                <input
+                  type="number"
+                  min={10}
+                  max={240}
+                  value={customFps}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setCustomFps(raw);
+                    const parsed = parseInt(raw, 10);
+                    if (!isNaN(parsed) && parsed >= 10 && parsed <= 240) {
+                      onUpdateSettings({ fps: parsed });
+                    }
+                  }}
+                  onBlur={() => {
+                    const parsed = parseInt(customFps, 10);
+                    if (isNaN(parsed) || parsed < 10) {
+                      setCustomFps('10');
+                      onUpdateSettings({ fps: 10 });
+                    } else if (parsed > 240) {
+                      setCustomFps('240');
+                      onUpdateSettings({ fps: 240 });
+                    }
+                  }}
+                  className="w-14 bg-transparent text-xs text-right font-mono font-bold text-zinc-100 focus:outline-hidden"
+                />
+                <span className="text-[11px] font-mono text-zinc-400 ml-1.5 font-medium">FPS</span>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -274,7 +274,7 @@ export const Studio: React.FC<StudioProps> = ({
             mandatory: {
               chromeMediaSource: 'desktop',
               chromeMediaSourceId: source.id,
-              minFrameRate: 30,
+              minFrameRate: Math.min(10, settings?.fps || 60),
               maxFrameRate: settings?.fps || 60,
             },
           },
@@ -498,11 +498,11 @@ export const Studio: React.FC<StudioProps> = ({
             canvasAnimRef.current = requestAnimationFrame(renderLoop);
           };
 
-          // Background safety interval: guarantees 60 FPS even if minimized to Windows Tray
+          // Background safety interval: guarantees target FPS even if minimized to Windows Tray
           const bgFallbackInterval = setInterval(() => {
             if (!isRecordingRef.current) return;
             const now = performance.now();
-            if (now - lastFrameTime >= 25) {
+            if (now - lastFrameTime >= Math.max(4, frameDuration * 0.8)) {
               compositor.render();
               lastFrameTime = now;
             }
