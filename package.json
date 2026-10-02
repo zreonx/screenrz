@@ -18,6 +18,7 @@
   "build": {
     "appId": "com.zreonx.screenrz",
     "productName": "Screenrz",
+    "electronDist": "node_modules/electron/dist",
     "directories": {
       "output": "dist-release"
     },
@@ -87,7 +88,7 @@
     "concurrently": "^10.0.5",
     "cross-env": "^10.1.0",
     "electron": "^44.4.5",
-    "electron-builder": "^26.0.0",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
