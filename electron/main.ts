@@ -43,14 +43,38 @@ let tray: Tray | null = null;
 let isRecordingState = false;
 let currentRecordingDuration = '';
 
-// Embedded high-contrast 16x16 PNG tray icons (Normal & Recording)
+// Embedded high-contrast 16x16 PNG fallback tray icons (Normal & Recording)
 const defaultTrayBase64 =
   'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAZElEQVQ4T2NkoBAwUqifYdQAMvj///8f/x8YGJgZGRk/4jGQkcHBwZGBgYFhERMT40e8BqC4gYGB4R8uA5AlmRgYGDKgYsgGUFxANoAZh4EcDRY8BrAQM4Dk8IH0eIDhAwkGAAAh2hcvs+JvGAAAAABJRU5ErkJggg==';
 const recTrayBase64 =
   'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAZ0lEQVQ4T2NkYPj/n4GBgYGRgYFBn4GBgZGREYbhVDAwMPz/j48BqAwwMDP+Z2Rg+A/kY0eNBIPhA2AYoHgUEMtANgA5gGEA2QAgx2EgzQC8BhAyAORwAOkhsIDhAwnqGgAAkEUYL+M90dMAAAAASUVORK5CYII=';
 
-const defaultTrayIcon = nativeImage.createFromDataURL('data:image/png;base64,' + defaultTrayBase64);
-const recTrayIcon = nativeImage.createFromDataURL('data:image/png;base64,' + recTrayBase64);
+function getAssetPath(...paths: string[]): string {
+  // Check dist-electron/assets (when bundled/packaged)
+  const distPath = path.join(__dirname, 'assets', ...paths);
+  if (fs.existsSync(distPath)) return distPath;
+
+  // Check electron/assets (in development)
+  const devPath = path.join(__dirname, '../electron/assets', ...paths);
+  if (fs.existsSync(devPath)) return devPath;
+
+  // Check app path resources
+  const appPath = path.join(app.getAppPath(), 'electron/assets', ...paths);
+  if (fs.existsSync(appPath)) return appPath;
+
+  return devPath;
+}
+
+function getTrayIcon(recording = false): Electron.NativeImage {
+  const file = recording ? 'tray-rec.png' : 'tray.png';
+  const iconPath = getAssetPath(file);
+  if (fs.existsSync(iconPath)) {
+    return nativeImage.createFromPath(iconPath);
+  }
+  return nativeImage.createFromDataURL(
+    'data:image/png;base64,' + (recording ? recTrayBase64 : defaultTrayBase64)
+  );
+}
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -75,8 +99,20 @@ function updateTrayMenu() {
       label: 'Open Screenrz',
       click: () => {
         if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
           mainWindow.show();
           mainWindow.focus();
+        }
+      },
+    },
+    {
+      label: 'About Screenrz Desktop',
+      click: () => {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.webContents.send('nav:go-to', 'about');
         }
       },
     },
@@ -117,7 +153,7 @@ function updateTrayMenu() {
 function createTray() {
   if (tray) return;
 
-  tray = new Tray(defaultTrayIcon);
+  tray = new Tray(getTrayIcon(false));
   tray.setToolTip('Screenrz - Ready');
 
   tray.on('click', () => {
@@ -147,12 +183,18 @@ function createTray() {
 function createWindow() {
   db = new LocalDatabase();
 
+  const windowIconPath = getAssetPath(process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+  const windowIcon = fs.existsSync(windowIconPath)
+    ? nativeImage.createFromPath(windowIconPath)
+    : undefined;
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 960,
     minHeight: 640,
     frame: false, // Frameless for modern custom titlebar
+    icon: windowIcon,
     backgroundColor: '#09090b',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -233,11 +275,11 @@ ipcMain.on('tray:update-state', (_event, { isRecording, durationText }) => {
 
   if (tray) {
     if (isRecording) {
-      tray.setImage(recTrayIcon);
+      tray.setImage(getTrayIcon(true));
       tray.setToolTip(`Screenrz - Recording (${currentRecordingDuration || 'Active'})`);
       mainWindow?.setProgressBar(1, { mode: 'error' }); // Windows taskbar red recording status
     } else {
-      tray.setImage(defaultTrayIcon);
+      tray.setImage(getTrayIcon(false));
       tray.setToolTip('Screenrz - Ready');
       mainWindow?.setProgressBar(-1); // Clear taskbar status
     }

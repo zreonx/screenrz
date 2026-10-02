@@ -4,6 +4,7 @@ import { Sidebar, NavTab } from '@/components/layout/Sidebar';
 import { Studio, StudioControls } from '@/components/recording/Studio';
 import { LibraryView } from '@/components/library/LibraryView';
 import { SettingsModal } from '@/components/settings/SettingsModal';
+import { AboutView } from '@/components/about/AboutView';
 import { VideoPlayerModal } from '@/components/player/VideoPlayerModal';
 import { AppSettings, RecordingItem } from '@/types/electron';
 import { formatDuration } from '@/lib/utils';
@@ -84,6 +85,19 @@ export function App() {
     };
   }, []);
 
+  // Listen for navigation requests (e.g. from System Tray "About")
+  useEffect(() => {
+    if (!window.electronAPI?.onNavigate) return;
+    const unbindNav = window.electronAPI.onNavigate((tab) => {
+      if (tab === 'studio' || tab === 'library' || tab === 'settings' || tab === 'about') {
+        setCurrentTab(tab);
+      }
+    });
+    return () => {
+      unbindNav?.();
+    };
+  }, []);
+
   const handleUpdateSettings = async (newSettings: Partial<AppSettings>) => {
     if (window.electronAPI) {
       await window.electronAPI.saveSettings(newSettings);
@@ -117,8 +131,11 @@ export function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#09090b] text-[#fafafa] font-sans antialiased">
-      {/* Frameless Windows Titlebar */}
-      <TitleBar isRecording={recordingState !== 'idle'} />
+      {/* Frameless Windows Titlebar with blue Screenrz branding */}
+      <TitleBar
+        isRecording={recordingState !== 'idle'}
+        onOpenAbout={() => setCurrentTab('about')}
+      />
 
       {/* Main App Container */}
       <div className="flex flex-1 overflow-hidden relative">
@@ -221,6 +238,11 @@ export function App() {
               settings={settings}
               onUpdateSettings={handleUpdateSettings}
             />
+          </div>
+
+          {/* About View - Dedicated About Screenrz Desktop */}
+          <div className={`h-full w-full ${currentTab === 'about' ? 'block' : 'hidden'}`}>
+            <AboutView settings={settings} />
           </div>
         </main>
       </div>

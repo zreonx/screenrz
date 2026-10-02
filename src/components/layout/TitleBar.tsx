@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Minus, Square, Copy, X, CircleDot } from 'lucide-react';
+import { Minus, Square, Copy, X } from 'lucide-react';
+import appIcon from '@/assets/icon.png';
 
 interface TitleBarProps {
   isRecording?: boolean;
+  onOpenAbout?: () => void;
 }
 
-export const TitleBar: React.FC<TitleBarProps> = ({ isRecording = false }) => {
+export const TitleBar: React.FC<TitleBarProps> = ({ isRecording = false, onOpenAbout }) => {
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
@@ -32,12 +34,18 @@ export const TitleBar: React.FC<TitleBarProps> = ({ isRecording = false }) => {
     <header className="h-9 w-full bg-[#09090b] border-b border-[#27272a] flex items-center justify-between select-none app-drag z-50">
       {/* Left: App Logo & Title */}
       <div className="flex items-center gap-2.5 px-3">
-        <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-rose-500 to-indigo-600 flex items-center justify-center text-white shadow-sm">
-          <CircleDot className="w-3.5 h-3.5" />
-        </div>
-        <span className="text-xs font-semibold tracking-wide text-zinc-300">
-          Screenrz
-        </span>
+        <button
+          onClick={onOpenAbout}
+          title="About Screenrz Desktop"
+          className="flex items-center gap-2 app-no-drag group cursor-pointer"
+        >
+          <div className="w-5 h-5 rounded-md overflow-hidden flex items-center justify-center shadow-xs ring-1 ring-blue-500/30 group-hover:ring-blue-400/60 transition-all bg-zinc-950">
+            <img src={appIcon} alt="Screenrz" className="w-full h-full object-cover" />
+          </div>
+          <span className="text-xs font-semibold tracking-wide text-zinc-200 group-hover:text-blue-300 transition-colors">
+            Screenrz
+          </span>
+        </button>
         {isRecording && (
           <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-medium animate-pulse">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />

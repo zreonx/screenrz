@@ -8,11 +8,12 @@ import {
   ChevronRight,
   HardDrive,
   ExternalLink,
+  Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppSettings } from '@/types/electron';
 
-export type NavTab = 'studio' | 'library' | 'settings';
+export type NavTab = 'studio' | 'library' | 'settings' | 'about';
 
 interface SidebarProps {
   currentTab: NavTab;
@@ -50,6 +51,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'settings' as NavTab,
       label: 'Settings',
       icon: Settings2,
+      badge: null,
+    },
+    {
+      id: 'about' as NavTab,
+      label: 'About',
+      icon: Info,
       badge: null,
     },
   ];

@@ -75,6 +75,7 @@ export interface ElectronAPI {
   updateTrayState: (isRecording: boolean, durationText?: string) => void;
   onHotkeyToggleRecord: (callback: () => void) => () => void;
   onHotkeyTogglePause: (callback: () => void) => () => void;
+  onNavigate?: (callback: (tab: string) => void) => () => void;
 }
 
 declare global {

@@ -89,6 +89,13 @@ const electronAPI = {
       ipcRenderer.removeListener('hotkey:toggle-pause', handler);
     };
   },
+  onNavigate: (callback: (tab: string) => void) => {
+    const handler = (_event: any, tab: string) => callback(tab);
+    ipcRenderer.on('nav:go-to', handler);
+    return () => {
+      ipcRenderer.removeListener('nav:go-to', handler);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
