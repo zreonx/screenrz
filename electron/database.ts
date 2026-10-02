@@ -5,11 +5,13 @@ import { app } from 'electron';
 export type CameraPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 export type CameraShape = 'circle' | 'rectangle';
 export type VideoFormat = 'mp4' | 'webm';
+export type VideoQuality = 'compact' | 'adaptive' | 'auto' | 'high' | 'ultra' | 'custom';
 
 export interface AppSettings {
   outputDirectory: string;
   fps: number;
-  videoQuality: 'auto' | 'high' | 'ultra';
+  videoQuality: VideoQuality;
+  customBitrateMbps?: number;
   videoFormat: VideoFormat;
   includeMic: boolean;
   includeAudio: boolean;
@@ -121,7 +123,8 @@ export class LocalDatabase {
     if (!currentSettings.outputDirectory) {
       this.saveSetting('outputDirectory', defaultDir);
       this.saveSetting('fps', '60');
-      this.saveSetting('videoQuality', 'high');
+      this.saveSetting('videoQuality', 'adaptive');
+      this.saveSetting('customBitrateMbps', '4.0');
       this.saveSetting('videoFormat', 'mp4');
       this.saveSetting('includeMic', '0');
       this.saveSetting('includeAudio', '1');
@@ -140,7 +143,8 @@ export class LocalDatabase {
     const defaults: AppSettings = {
       outputDirectory: defaultDir,
       fps: 60,
-      videoQuality: 'high',
+      videoQuality: 'adaptive',
+      customBitrateMbps: 4.0,
       videoFormat: 'mp4',
       includeMic: false,
       includeAudio: true,
@@ -175,6 +179,7 @@ export class LocalDatabase {
         outputDirectory: map.outputDirectory || defaults.outputDirectory,
         fps: map.fps ? parseInt(map.fps, 10) : defaults.fps,
         videoQuality: (map.videoQuality as any) || defaults.videoQuality,
+        customBitrateMbps: map.customBitrateMbps ? parseFloat(map.customBitrateMbps) : defaults.customBitrateMbps,
         videoFormat: (map.videoFormat as any) || defaults.videoFormat,
         includeMic: map.includeMic === '1',
         includeAudio: map.includeAudio === '1',

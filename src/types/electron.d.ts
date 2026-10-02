@@ -1,11 +1,13 @@
 export type CameraPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 export type CameraShape = 'circle' | 'rectangle';
 export type VideoFormat = 'mp4' | 'webm';
+export type VideoQuality = 'compact' | 'adaptive' | 'auto' | 'high' | 'ultra' | 'custom';
 
 export interface AppSettings {
   outputDirectory: string;
   fps: number;
-  videoQuality: 'auto' | 'high' | 'ultra';
+  videoQuality: VideoQuality;
+  customBitrateMbps?: number;
   videoFormat: VideoFormat;
   includeMic: boolean;
   includeAudio: boolean;

@@ -41,7 +41,8 @@ export function App() {
       setSettings({
         outputDirectory: 'C:\\Users\\User\\Videos\\Screenrz',
         fps: 60,
-        videoQuality: 'high',
+        videoQuality: 'adaptive',
+        customBitrateMbps: 4.0,
         videoFormat: 'mp4',
         includeMic: false,
         includeAudio: true,
