@@ -1,14 +1,8 @@
-import React from 'react';
 import {
   ExternalLink,
   Heart,
-  Cpu,
   ShieldCheck,
   Zap,
-  HardDrive,
-  Keyboard,
-  Layers,
-  Code2,
   CheckCircle2,
   FolderOpen,
 } from 'lucide-react';
@@ -122,55 +116,6 @@ export const AboutView: React.FC<AboutViewProps> = ({ settings }) => {
               <span>Visit GitHub Profile</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </button>
-          </div>
-        </div>
-
-        {/* Architecture & Tech Stack Details */}
-        <div className="space-y-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            System Architecture
-          </span>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
-              <div className="flex items-center gap-2 text-zinc-200 text-xs font-semibold">
-                <Layers className="w-4 h-4 text-blue-400" />
-                <span>WebGL Compositing Engine</span>
-              </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Direct GLSL fragment shader pipeline composites screen capture and webcam picture-in-picture at fixed 60 FPS with zero CPU software blending overhead.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
-              <div className="flex items-center gap-2 text-zinc-200 text-xs font-semibold">
-                <HardDrive className="w-4 h-4 text-cyan-400" />
-                <span>Embedded SQLite Database</span>
-              </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Powered by Node 22 native <code className="text-zinc-300 font-mono text-[11px]">node:sqlite</code> with WAL (Write-Ahead Logging) mode for instant catalog searches and persistent settings.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
-              <div className="flex items-center gap-2 text-zinc-200 text-xs font-semibold">
-                <Keyboard className="w-4 h-4 text-indigo-400" />
-                <span>Global System Shortcuts</span>
-              </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Seamless <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[10px] text-zinc-200 font-mono">F12</kbd> (Start/Stop) and <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[10px] text-zinc-200 font-mono">Shift+F12</kbd> (Pause/Resume) hotkeys registered system-wide.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
-              <div className="flex items-center gap-2 text-zinc-200 text-xs font-semibold">
-                <Cpu className="w-4 h-4 text-emerald-400" />
-                <span>Modern Frontend Stack</span>
-              </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Built with React 19, Tailwind CSS, Lucide icons, and Electron 44 for buttery-smooth animations and responsiveness.
-              </p>
-            </div>
           </div>
         </div>
 
