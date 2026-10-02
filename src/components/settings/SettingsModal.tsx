@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import {
   FolderOpen,
   HardDrive,
-  Database,
   Sliders,
-  Check,
   Minimize2,
   Keyboard,
   Sparkles,
@@ -50,7 +48,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           Settings & Preferences
         </h1>
         <p className="text-xs text-zinc-400 mt-1">
-          Configure local recording storage paths, hardware capture parameters, and SQLite storage.
+          Configure local recording storage paths and hardware capture parameters.
         </p>
       </div>
 
@@ -280,21 +278,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* SECTION 5: Local SQLite Engine Status */}
-      <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-          <Database className="w-4 h-4 text-emerald-400" />
-          <h3>Embedded SQLite Database</h3>
-        </div>
-        <p className="text-xs text-zinc-400">
-          Screenrz stores catalog indexes and preferences locally in an embedded SQLite database (`screenrz.db`) in your user data directory.
-        </p>
-        <div className="flex items-center gap-2 pt-1 text-[11px] text-emerald-400 font-medium">
-          <Check className="w-3.5 h-3.5" />
-          SQLite Database: Active & Synchronized
         </div>
       </div>
       </div>
