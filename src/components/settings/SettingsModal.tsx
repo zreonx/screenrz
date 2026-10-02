@@ -170,6 +170,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
+        {/* Output Video Format & Extension */}
+        <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
+          <div>
+            <div className="text-xs font-medium text-zinc-200">Video Format &amp; Extension</div>
+            <div className="text-[11px] text-zinc-500">
+              MP4 is universally playable on iPhone, Mac, Windows, TVs, and editing software.
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-zinc-950 border border-zinc-800">
+            {(
+              [
+                { id: 'mp4', label: 'MP4 (.mp4)' },
+                { id: 'webm', label: 'WebM (.webm)' },
+              ] as const
+            ).map((fmt) => (
+              <button
+                key={fmt.id}
+                onClick={() => onUpdateSettings({ videoFormat: fmt.id })}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  (settings?.videoFormat || 'mp4') === fmt.id
+                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                {fmt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Auto Minimize (Bandicam Mode) */}
         <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
           <div className="flex items-center gap-2.5">

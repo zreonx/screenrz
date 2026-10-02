@@ -340,8 +340,9 @@ export const Studio: React.FC<StudioProps> = ({
           .toISOString()
           .replace(/T/, '_')
           .replace(/:/g, '-')
-          .split('.')[0];
-        const fileName = `Screenrz_${formattedDate}.webm`;
+        const isMp4 = mimeType.startsWith('video/mp4');
+        const ext = isMp4 ? 'mp4' : 'webm';
+        const fileName = `Screenrz_${formattedDate}.${ext}`;
 
         // Save directly to user's disk directory via Electron
         const saveResult = await window.electronAPI.saveRecordingFile(fileName, buffer);
@@ -520,19 +521,43 @@ export const Studio: React.FC<StudioProps> = ({
 
       recordedChunksRef.current = [];
 
-      // Determine optimal mimeType (VP8 is hardware/CPU light, avoiding VP9 software encoding lag)
-      const mimeTypes = [
-        'video/webm;codecs=vp8,opus',
-        'video/webm;codecs=h264,opus',
-        'video/webm;codecs=vp8',
-        'video/webm',
-      ];
-      let selectedMime = 'video/webm';
-      for (const m of mimeTypes) {
-        if (MediaRecorder.isTypeSupported(m)) {
-          selectedMime = m;
-          break;
+      // Determine optimal mimeType based on user preference (MP4 or WebM)
+      const wantsMp4 = settings?.videoFormat !== 'webm';
+      let selectedMime = '';
+
+      if (wantsMp4) {
+        const mp4Types = [
+          'video/mp4;codecs=avc1,mp4a.40.2',
+          'video/mp4;codecs=avc1',
+          'video/mp4;codecs=h264,aac',
+          'video/mp4;codecs=h264,opus',
+          'video/mp4',
+        ];
+        for (const m of mp4Types) {
+          if (MediaRecorder.isTypeSupported(m)) {
+            selectedMime = m;
+            break;
+          }
         }
+      }
+
+      if (!selectedMime) {
+        const webmTypes = [
+          'video/webm;codecs=vp8,opus',
+          'video/webm;codecs=h264,opus',
+          'video/webm;codecs=vp8',
+          'video/webm',
+        ];
+        for (const m of webmTypes) {
+          if (MediaRecorder.isTypeSupported(m)) {
+            selectedMime = m;
+            break;
+          }
+        }
+      }
+
+      if (!selectedMime) {
+        selectedMime = 'video/webm';
       }
 
       const recorder = new MediaRecorder(combinedStream, {

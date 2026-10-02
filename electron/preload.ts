@@ -2,11 +2,13 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 export type CameraPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 export type CameraShape = 'circle' | 'rectangle';
+export type VideoFormat = 'mp4' | 'webm';
 
 export interface AppSettings {
   outputDirectory: string;
   fps: number;
   videoQuality: 'auto' | 'high' | 'ultra';
+  videoFormat: VideoFormat;
   includeMic: boolean;
   includeAudio: boolean;
   includeCamera: boolean;

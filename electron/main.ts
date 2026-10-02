@@ -444,13 +444,16 @@ app.whenReady().then(() => {
           },
         });
 
+        const fileExt = path.extname(filePath).toLowerCase();
+        const mimeType = fileExt === '.mp4' ? 'video/mp4' : fileExt === '.mkv' ? 'video/x-matroska' : 'video/webm';
+
         return new Response(readableStream, {
           status: 206,
           headers: {
             'Content-Range': `bytes ${start}-${end}/${fileSize}`,
             'Accept-Ranges': 'bytes',
             'Content-Length': chunkSize.toString(),
-            'Content-Type': 'video/webm',
+            'Content-Type': mimeType,
           },
         });
       }
@@ -468,12 +471,15 @@ app.whenReady().then(() => {
         },
       });
 
+      const fileExt = path.extname(filePath).toLowerCase();
+      const mimeType = fileExt === '.mp4' ? 'video/mp4' : fileExt === '.mkv' ? 'video/x-matroska' : 'video/webm';
+
       return new Response(readableStream, {
         status: 200,
         headers: {
           'Accept-Ranges': 'bytes',
           'Content-Length': fileSize.toString(),
-          'Content-Type': 'video/webm',
+          'Content-Type': mimeType,
         },
       });
     } catch (e: any) {

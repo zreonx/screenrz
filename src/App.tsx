@@ -42,6 +42,7 @@ export function App() {
         outputDirectory: 'C:\\Users\\User\\Videos\\Screenrz',
         fps: 60,
         videoQuality: 'high',
+        videoFormat: 'mp4',
         includeMic: false,
         includeAudio: true,
         includeCamera: false,

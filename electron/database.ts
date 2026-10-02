@@ -4,11 +4,13 @@ import { app } from 'electron';
 
 export type CameraPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 export type CameraShape = 'circle' | 'rectangle';
+export type VideoFormat = 'mp4' | 'webm';
 
 export interface AppSettings {
   outputDirectory: string;
   fps: number;
   videoQuality: 'auto' | 'high' | 'ultra';
+  videoFormat: VideoFormat;
   includeMic: boolean;
   includeAudio: boolean;
   includeCamera: boolean;
@@ -120,6 +122,7 @@ export class LocalDatabase {
       this.saveSetting('outputDirectory', defaultDir);
       this.saveSetting('fps', '60');
       this.saveSetting('videoQuality', 'high');
+      this.saveSetting('videoFormat', 'mp4');
       this.saveSetting('includeMic', '0');
       this.saveSetting('includeAudio', '1');
       this.saveSetting('includeCamera', '0');
@@ -138,6 +141,7 @@ export class LocalDatabase {
       outputDirectory: defaultDir,
       fps: 60,
       videoQuality: 'high',
+      videoFormat: 'mp4',
       includeMic: false,
       includeAudio: true,
       includeCamera: false,
@@ -171,6 +175,7 @@ export class LocalDatabase {
         outputDirectory: map.outputDirectory || defaults.outputDirectory,
         fps: map.fps ? parseInt(map.fps, 10) : defaults.fps,
         videoQuality: (map.videoQuality as any) || defaults.videoQuality,
+        videoFormat: (map.videoFormat as any) || defaults.videoFormat,
         includeMic: map.includeMic === '1',
         includeAudio: map.includeAudio === '1',
         includeCamera: map.includeCamera === '1',
